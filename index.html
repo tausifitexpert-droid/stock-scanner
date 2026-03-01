@@ -376,12 +376,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="panel-card">
         <div class="panel-title">🔗 API Resources Used This Run</div>
         <div class="api-row">
-          <div class="api-name">FMP /stock_market/gainers</div>
+          <div class="api-name">FMP /stable/biggest-gainers</div>
           <div class="api-calls" id="callGainers">1 call</div>
           <div class="api-status api-pend" id="statusGainers">PENDING</div>
         </div>
         <div class="api-row">
-          <div class="api-name">FMP /profile/{symbol}</div>
+          <div class="api-name">FMP /stable/profile?symbol=</div>
           <div class="api-calls" id="callProfiles">— calls</div>
           <div class="api-status api-pend" id="statusProfiles">PENDING</div>
         </div>
@@ -559,10 +559,10 @@ function diagnoseError(status, message, context) {
     what = 'HTTP 403 Forbidden — Server refused your request';
     why = 'Your API key exists but the endpoint returned 403. This was caused by using the old legacy URL (/stock_market/gainers). The app now uses the correct URL (/api/v3/gainers). If you still see 403, your daily 250-call limit may be exhausted.';
     fixes = [
-      'Paste this URL directly in a new browser tab to test your key live: https://financialmodelingprep.com/api/v3/gainers?apikey=' + API_KEY,
-      'If the browser tab shows stock data → your key works, the issue is CORS (use python3 server)',
-      'If the browser tab shows {"Error Message":"..."} → your daily 250-call limit is exhausted, resets at midnight UTC',
-      'If the browser tab shows 401 → your key is invalid, get a fresh one at financialmodelingprep.com/developer/docs',
+      'Paste this URL in a new browser tab to test: https://financialmodelingprep.com/stable/biggest-gainers?apikey=' + API_KEY,
+      'If it shows stock data → your key works but there is a CORS issue — host the file on GitHub Pages',
+      'If it shows {"Error Message":"Legacy Endpoint..."} → your account was created after Aug 31 2025 and v3 is blocked (this app now uses /stable/ which should fix it)',
+      'If it shows {"Error Message":"Limit Reach..."} → your daily 250-call limit is exhausted, resets at midnight UTC (8PM EST)',
       'Log into financialmodelingprep.com → Dashboard → check your API usage meter'
     ];
   } else if(status===401){
@@ -659,14 +659,14 @@ async function loadData() {
   addLog('🚀','Scan started','info','NEW RUN','badge-api');
   addLog('📋','Active filters: Exclude Healthcare, Biotech, Pharma | Min price $5 | Min volume 500K | Max gain 15%','');
   addLog('🧮','Scoring weights: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt max','data');
-  addLog('🌐','Preparing API call #1 → FMP /api/v3/gainers (free-tier correct endpoint)','info','API CALL','badge-api');
+  addLog('🌐','Preparing API call #1 → FMP /stable/biggest-gainers (new stable endpoint)','info','API CALL','badge-api');
 
   try {
     // ── STEP 1: Gainers ────────────────────────────────────
     setProgress(10);
-    const gainersUrl = `https://financialmodelingprep.com/api/v3/gainers?apikey=${API_KEY}`;
+    const gainersUrl = `https://financialmodelingprep.com/stable/biggest-gainers?apikey=${API_KEY}`;
     addLog('📡',`GET ${gainersUrl.replace(API_KEY,'[KEY]')}`, 'info');
-    addLog('ℹ️','Using correct free-tier endpoint: /api/v3/gainers (not legacy /stock_market/gainers)','info');
+    addLog('ℹ️','Using new /stable/ endpoint — v3 endpoints are legacy and blocked for accounts created after Aug 31 2025','info');
 
     let gainersRes;
     try {
@@ -684,29 +684,46 @@ async function loadData() {
 
     if(!gainersRes.ok){
       const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='ERROR '+gainersRes.status;
-      diagnoseError(gainersRes.status, gainersRes.statusText, 'Fetching /api/v3/gainers');
+      diagnoseError(gainersRes.status, gainersRes.statusText, 'Fetching /stable/biggest-gainers');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
     let gainersData = await gainersRes.json();
 
-    if(gainersData['Error Message']){
+    if(gainersData && gainersData['Error Message']){
       const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='API ERR';
-      diagnoseError(403, gainersData['Error Message'], 'FMP returned Error Message in body — check your plan at financialmodelingprep.com/developer/docs');
+      diagnoseError(403, gainersData['Error Message'], 'FMP returned Error Message — check plan at financialmodelingprep.com/developer/docs/pricing');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
-    // Fallback to /actives if gainers empty (pre-market or closed)
+    // Normalize field names — /stable/ API uses slightly different field names
+    if(Array.isArray(gainersData)){
+      gainersData = gainersData.map(s=>({
+        symbol: s.symbol,
+        name: s.name||s.companyName||s.symbol,
+        price: parseFloat(s.price||s.lastPrice||0),
+        changesPercentage: parseFloat(s.changesPercentage||s.changePercentage||s.percentChange||0),
+        volume: parseInt(s.volume||0),
+        change: parseFloat(s.change||0)
+      })).filter(s=>s.symbol);
+    }
+
+    // Fallback to /stable/most-active if gainers empty (market closed / pre-market)
     if(!Array.isArray(gainersData)||gainersData.length===0){
-      addLog('⚠️','Gainers empty — trying /api/v3/actives as fallback...','warn');
-      const activesRes=await fetch(`https://financialmodelingprep.com/api/v3/actives?apikey=${API_KEY}`);
+      addLog('⚠️','Gainers empty — trying /stable/most-active as fallback...','warn');
+      const activesRes=await fetch(`https://financialmodelingprep.com/stable/most-active?apikey=${API_KEY}`);
       apiCallCount++;
-      if(activesRes.ok){ gainersData=await activesRes.json(); }
+      if(activesRes.ok){
+        let a=await activesRes.json();
+        if(Array.isArray(a)&&a.length>0){
+          gainersData=a.map(s=>({symbol:s.symbol,name:s.name||s.symbol,price:parseFloat(s.price||0),changesPercentage:parseFloat(s.changesPercentage||s.changePercentage||0),volume:parseInt(s.volume||0),change:parseFloat(s.change||0)}));
+          addLog('✅',`Fallback /stable/most-active returned ${gainersData.length} stocks`,'ok');
+        }
+      }
       if(!Array.isArray(gainersData)||gainersData.length===0){
-        diagnoseError(200,'No market data available from /gainers or /actives','US market is likely closed. Market hours: Mon–Fri 9:30AM–4:00PM EST. Try again during market hours.');
+        diagnoseError(200,'No market data available','US market is likely closed. Hours: Mon–Fri 9:30AM–4:00PM EST.');
         setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
       }
-      addLog('✅',`Fallback /actives returned ${gainersData.length} stocks`,'ok');
     }
 
     const el1=document.getElementById('statusGainers'); el1.className='api-status api-ok'; el1.textContent='OK ✓';
@@ -731,15 +748,17 @@ async function loadData() {
 
       await Promise.all(batch.map(async(stock)=>{
         try{
-          const url=`https://financialmodelingprep.com/api/v3/profile/${stock.symbol}?apikey=${API_KEY}`;
+          const url=`https://financialmodelingprep.com/stable/profile?symbol=${stock.symbol}&apikey=${API_KEY}`;
           const res=await fetch(url);
           apiCallCount++;
           if(res.ok){
             const d=await res.json();
-            if(Array.isArray(d)&&d.length>0){
-              profileCache[stock.symbol]=d[0];
+            // /stable/profile returns object or array — handle both
+            const profile = Array.isArray(d) ? d[0] : (d && d.symbol ? d : null);
+            if(profile){
+              profileCache[stock.symbol]=profile;
               profileOk++;
-              addLog('✓',`${stock.symbol} → Sector: "${d[0].sector||'—'}" | Industry: "${d[0].industry||'—'}" | MktCap: ${fmtMktCap(d[0].mktCap)}`,'ok');
+              addLog('✓',`${stock.symbol} → Sector: "${profile.sector||'—'}" | Industry: "${profile.industry||'—'}" | MktCap: ${fmtMktCap(profile.mktCap)}`,'ok');
             } else {
               addLog('⚠',`${stock.symbol} → Profile returned empty array`,'warn');
               profileFail++;
