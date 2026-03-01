@@ -251,7 +251,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="stat-card">
       <div class="stat-label">API Calls Used</div>
       <div class="stat-value cyan" id="statCalls">—</div>
-      <div class="stat-sub">of 250/day free tier</div>
+      <div class="stat-sub">max 13 calls/scan</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Run Time</div>
@@ -382,9 +382,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="api-status api-pend" id="statusGainers">PENDING</div>
         </div>
         <div class="api-row">
-          <div class="api-name">FMP /stable/profile?symbol=</div>
+          <div class="api-name">FMP /stable/profile?symbol= (max 12)</div>
           <div class="api-calls" id="callProfiles">— calls</div>
           <div class="api-status api-pend" id="statusProfiles">PENDING</div>
+        </div>
+        <div class="api-row" style="background:rgba(0,255,157,0.03);border-radius:6px;">
+          <div class="api-name" style="color:var(--green);">Total per scan (max)</div>
+          <div class="api-calls" style="color:var(--green);">13 calls</div>
+          <div class="api-status" style="color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:10px;">19 scans/day free</div>
         </div>
         <div class="api-row">
           <div class="api-name">Total API calls this run</div>
@@ -753,20 +758,66 @@ async function loadData() {
     document.getElementById('statFetched').textContent = gainersData.length;
     document.getElementById('statFetchedSub').textContent = `${gainersData.length} total gainers today`;
 
-    const allStocks = gainersData.slice(0,30);
-    addLog('✂️',`Sliced to top ${allStocks.length} stocks for profile lookup (API call budget control)`,'');
+    // ── PRE-FILTER BEFORE PROFILE CALLS (saves API calls) ──
+    // Apply cheap filters first (price, volume, % gain) using data we ALREADY have
+    // Only fetch profiles for stocks that pass these basic checks
+    // This reduces profile calls from 30 → typically 8-12, saving ~20 API calls per scan
+    addLog('⚡','Pre-filtering with available data BEFORE profile lookups — saves API calls','info','BUDGET SAVER','badge-score');
+
+    const PRE_MIN_PRICE  = 5;      // Must be above $5 — eliminates penny stocks immediately
+    const PRE_MIN_VOLUME = 200000; // Must have 200K+ volume — eliminates dead stocks
+    const PRE_MIN_PCT    = 1.0;    // Must have 1%+ gain — eliminates flat movers
+    const PRE_MAX_PCT    = 50;     // Must be below 50% — eliminates blowoff spikes
+    const PRE_MAX_STOCKS = 12;     // Only profile top 12 candidates — caps calls at 13 total
+
+    // Known healthcare/biotech tickers we can filter without a profile call
+    const KNOWN_EXCLUDED_TICKERS = ['MRNA','PFE','JNJ','ABBV','BMY','LLY','MRK','GILD',
+      'AMGN','BIIB','REGN','VRTX','ILMN','HOLX','TECH','PKI','WAT','WST','IDXX','IQV',
+      'CRL','MTD','RMD','STE','ALGN','ISRG','BAX','BDX','BSX','COO','DVA','EW','HSIC',
+      'MCK','MOH','UNH','HUM','CVS','CI','CNC','ANTM','WBA','CAH','ABC'];
+
+    const preFiltered = gainersData
+      .filter(s => {
+        const price = s.price;
+        const vol   = s.volume;
+        const pct   = s.changesPercentage;
+        const sym   = s.symbol;
+
+        if(KNOWN_EXCLUDED_TICKERS.includes(sym)){
+          addLog('⚡',`PRE-SKIP ${sym} — Known healthcare/pharma ticker (no API call needed)`,'warn');
+          return false;
+        }
+        if(price < PRE_MIN_PRICE){
+          addLog('⚡',`PRE-SKIP ${sym} — Price $${price?.toFixed(2)} below $${PRE_MIN_PRICE}`,'warn'); return false;
+        }
+        if(vol < PRE_MIN_VOLUME){
+          addLog('⚡',`PRE-SKIP ${sym} — Volume ${fmtVol(vol)} below ${fmtVol(PRE_MIN_VOLUME)}`,'warn'); return false;
+        }
+        if(pct < PRE_MIN_PCT){
+          addLog('⚡',`PRE-SKIP ${sym} — Gain ${pct?.toFixed(2)}% below ${PRE_MIN_PCT}% minimum`,'warn'); return false;
+        }
+        if(pct > PRE_MAX_PCT){
+          addLog('⚡',`PRE-SKIP ${sym} — Gain ${pct?.toFixed(2)}% above ${PRE_MAX_PCT}% blowoff cap`,'warn'); return false;
+        }
+        return true;
+      })
+      .slice(0, PRE_MAX_STOCKS); // Cap at 12 stocks max for profile calls
+
+    const skipped = gainersData.length - preFiltered.length;
+    addLog('✅',`Pre-filter complete — ${preFiltered.length} candidates selected, ${skipped} skipped (0 API calls used for skipped stocks)`,'ok');
+    addLog('💰',`API budget: 1 (gainers) + ${preFiltered.length} (profiles) = ${preFiltered.length + 1} total calls this scan`,'info','BUDGET','badge-score');
     setProgress(20);
 
-    // ── STEP 2: Profiles ───────────────────────────────────
-    addLog('🏢',`Starting company profile lookups — ${allStocks.length} API calls incoming`,'info','PROFILES','badge-api');
+    // ── STEP 2: Profiles (only for pre-filtered candidates) ─
+    addLog('🏢',`Fetching profiles for ${preFiltered.length} candidates only`,'info','PROFILES','badge-api');
     const profileCache = {};
-    const batchSize = 5;
+    const batchSize = 4;
     let profileOk=0, profileFail=0;
 
-    for(let i=0;i<allStocks.length;i+=batchSize){
-      const batch = allStocks.slice(i,i+batchSize);
-      setProgress(20 + ((i/allStocks.length)*55));
-      addLog('📦',`Profile batch ${Math.floor(i/batchSize)+1}/${Math.ceil(allStocks.length/batchSize)}: fetching ${batch.map(s=>s.symbol).join(', ')}`,'data');
+    for(let i=0;i<preFiltered.length;i+=batchSize){
+      const batch = preFiltered.slice(i,i+batchSize);
+      setProgress(20 + ((i/preFiltered.length)*55));
+      addLog('📦',`Profile batch ${Math.floor(i/batchSize)+1}/${Math.ceil(preFiltered.length/batchSize)}: ${batch.map(s=>s.symbol).join(', ')}`,'data');
 
       await Promise.all(batch.map(async(stock)=>{
         try{
@@ -808,7 +859,7 @@ async function loadData() {
     addLog('🔍','Applying filters and scoring each stock...','info','FILTERS','badge-filter');
     const passedStocks=[], blockedStocks=[];
 
-    for(const stock of allStocks){
+    for(const stock of preFiltered){
       const profile = profileCache[stock.symbol]||{};
       const sector  = profile.sector||stock.sector||'';
       const industry= profile.industry||'';
