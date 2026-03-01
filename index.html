@@ -364,12 +364,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <!-- FILTER RULES -->
       <div class="panel-card">
         <div class="panel-title">⚙ Active Filter Rules</div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Healthcare sector</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Biotechnology</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Pharmaceutical</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">💰</span><span class="rule-text">Price &gt; $5 (no penny stocks)</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">📊</span><span class="rule-text">Volume &gt; 500,000 shares</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">📈</span><span class="rule-text">Gain capped at 15% (blowoff protection)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Healthcare sector (exact match)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Biotechnology (exact match)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Pharmaceutical (exact match)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">💰</span><span class="rule-text">Price &gt; $2 minimum</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">📊</span><span class="rule-text">Volume &gt; 100K shares</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">📈</span><span class="rule-text">Gain capped at 50% (blowoff protection)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">⚠️</span><span class="rule-text">Missing sector = NOT blocked (avoids false positives)</span><span class="rule-on">ON</span></div>
       </div>
 
       <!-- API STATUS -->
@@ -425,7 +426,19 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <script>
 const API_KEY = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
-const EXCLUDED = ['healthcare','biotechnology','pharmaceutical','biotech','medical devices','drug manufacturers','drug','clinical','diagnostics'];
+
+// EXACT sector/industry names that FMP returns — must be precise to avoid false blocks
+const EXCLUDED_SECTORS   = ['healthcare','biotechnology','pharmaceutical'];
+const EXCLUDED_INDUSTRIES = ['biotechnology','pharmaceuticals','drug manufacturers - general',
+                              'drug manufacturers - specialty & generic','medical devices',
+                              'diagnostics & research','health information services',
+                              'medical distribution','medical instruments & supplies',
+                              'medical care facilities'];
+
+// Market-adaptive thresholds — relaxed during pre-market/weekend/low-volume periods
+const MIN_PRICE  = 2;      // $2 min (catches more real stocks, penny filter still active)
+const MIN_VOLUME = 100000; // 100K min — 500K is way too strict for pre-market & weekends
+const MAX_PCT    = 50;     // 50% cap — only block true blowoffs
 
 let logVisible = true;
 let runStart = 0;
@@ -476,7 +489,16 @@ function fmtVol(v){if(!v)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v
 function fmtMktCap(v){if(!v)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(2)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
 function sectorClass(s){if(!s)return'sector-other';s=s.toLowerCase();if(s.includes('tech')||s.includes('soft')||s.includes('semi')||s.includes('commun'))return'sector-tech';if(s.includes('financ')||s.includes('bank')||s.includes('crypto')||s.includes('insur'))return'sector-fin';if(s.includes('energy')||s.includes('oil')||s.includes('gas')||s.includes('util'))return'sector-energy';if(s.includes('consumer')||s.includes('retail')||s.includes('real estate')||s.includes('indust'))return'sector-cons';return'sector-other';}
 function pctClass(p){return p>=5?'pct-hot':p>=2?'pct-warm':'pct-mild';}
-function isExcluded(sector,industry){const s=(sector||'').toLowerCase(),i=(industry||'').toLowerCase();return EXCLUDED.some(x=>s.includes(x)||i.includes(x));}
+function isExcluded(sector, industry){
+  const s = (sector||'').toLowerCase().trim();
+  const i = (industry||'').toLowerCase().trim();
+  // Only block if sector is EXACTLY one of the excluded names
+  const sectorBlocked   = EXCLUDED_SECTORS.some(x => s === x || s.startsWith(x));
+  const industryBlocked = EXCLUDED_INDUSTRIES.some(x => i === x || i.includes(x));
+  // If sector is empty/unknown, DON'T block — missing data shouldn't disqualify a stock
+  if(!s || s === 'unknown' || s === '') return false;
+  return sectorBlocked || industryBlocked;
+}
 
 // ── SCORING ENGINE ─────────────────────────────────────────
 function scoreStock(stock) {
@@ -657,7 +679,7 @@ async function loadData() {
   setProgress(5);
 
   addLog('🚀','Scan started','info','NEW RUN','badge-api');
-  addLog('📋','Active filters: Exclude Healthcare, Biotech, Pharma | Min price $5 | Min volume 500K | Max gain 15%','');
+  addLog('📋',`Active filters: Exclude Healthcare/Biotech/Pharma (exact) | Min price $${MIN_PRICE} | Min volume ${fmtVol(MIN_VOLUME)} | Max gain ${MAX_PCT}% | Missing sector = not blocked`,'');
   addLog('🧮','Scoring weights: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt max','data');
   addLog('🌐','Preparing API call #1 → FMP /stable/biggest-gainers (new stable endpoint)','info','API CALL','badge-api');
 
@@ -802,17 +824,17 @@ async function loadData() {
       };
 
       if(isExcluded(sector,industry)){
-        blockedStocks.push({...enriched,blockReason:`Sector: ${sector||industry||'Healthcare/Biotech/Pharma'}`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" matches exclusion list`,'err','FILTERED','badge-filter');
-      } else if(price<5){
-        blockedStocks.push({...enriched,blockReason:`Penny stock ($${price.toFixed(2)} < $5)`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Price $${price.toFixed(2)} below $5 minimum`,'err','FILTERED','badge-filter');
-      } else if(vol<500000){
-        blockedStocks.push({...enriched,blockReason:`Low volume (${fmtVol(vol)} < 500K)`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Volume ${fmtVol(vol)} below 500K minimum`,'err','FILTERED','badge-filter');
-      } else if(pct>15){
-        blockedStocks.push({...enriched,blockReason:`Gain ${pct.toFixed(1)}% exceeds 15% blowoff cap`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Gain ${pct.toFixed(1)}% exceeds 15% blowoff protection cap`,'err','FILTERED','badge-filter');
+        blockedStocks.push({...enriched,blockReason:`Sector: "${sector||industry}" — excluded`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" is in exclusion list`,'err','FILTERED','badge-filter');
+      } else if(price < MIN_PRICE){
+        blockedStocks.push({...enriched,blockReason:`Price $${price.toFixed(2)} below $${MIN_PRICE} minimum`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Price $${price.toFixed(2)} below $${MIN_PRICE} minimum`,'err','FILTERED','badge-filter');
+      } else if(vol < MIN_VOLUME){
+        blockedStocks.push({...enriched,blockReason:`Volume ${fmtVol(vol)} below ${fmtVol(MIN_VOLUME)} minimum`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Volume ${fmtVol(vol)} below ${fmtVol(MIN_VOLUME)} threshold`,'err','FILTERED','badge-filter');
+      } else if(pct > MAX_PCT){
+        blockedStocks.push({...enriched,blockReason:`Gain ${pct.toFixed(1)}% exceeds ${MAX_PCT}% blowoff cap`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Gain ${pct.toFixed(1)}% exceeds ${MAX_PCT}% blowoff cap`,'err','FILTERED','badge-filter');
       } else {
         const scored = scoreStock(enriched);
         stockScores[stock.symbol] = scored;
