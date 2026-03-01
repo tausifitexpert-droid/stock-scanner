@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live AI Stock Scanner</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --bg:#060a0f; --surface:#0c1219; --surface2:#111b26; --surface3:#162233;
+  --border:#1c2e40; --border2:#243a50;
+  --cyan:#00e5ff; --green:#00ff9d; --orange:#ff7043;
+  --yellow:#ffd600; --red:#ff1744; --pink:#f50057;
+  --text:#ddeeff; --muted:#3d5a73; --muted2:#5a7a96;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.01) 2px,rgba(0,229,255,0.01) 4px);pointer-events:none;z-index:9999;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.02) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(6,10,15,0.97);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:36px;height:36px;border:2px solid var(--cyan);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 15px rgba(0,229,255,0.3);animation:iconGlow 3s infinite alternate;}
+@keyframes iconGlow{from{box-shadow:0 0 10px rgba(0,229,255,0.2);}to{box-shadow:0 0 25px rgba(0,229,255,0.6);}}
+.logo-text{font-size:17px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#fff;}
+.logo-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;margin-top:1px;}
+.topbar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.live-indicator{display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);letter-spacing:1px;}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:livePulse 1.5s infinite;}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
+.clock{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted2);letter-spacing:1px;}
+.btn-refresh{background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;text-transform:uppercase;}
+.btn-refresh:hover{background:rgba(0,229,255,0.15);box-shadow:0 0 20px rgba(0,229,255,0.2);}
+.btn-refresh:disabled{opacity:0.4;cursor:not-allowed;}
+.market-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 12px;border-radius:20px;letter-spacing:1px;}
+.market-open{background:rgba(0,255,157,0.1);color:var(--green);border:1px solid rgba(0,255,157,0.3);}
+.market-closed{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.3);}
+.market-pre{background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.3);}
+
+/* MAIN */
+.main{padding:24px;max-width:1500px;margin:0 auto;}
+.disclaimer{background:rgba(255,214,0,0.05);border:1px solid rgba(255,214,0,0.15);border-radius:8px;padding:10px 16px;font-size:11px;color:rgba(255,214,0,0.6);font-family:'IBM Plex Mono',monospace;margin-bottom:18px;letter-spacing:0.5px;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.4;}
+.stat-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;}
+.stat-value{font-size:24px;font-weight:800;color:#fff;line-height:1;}
+.stat-value.cyan{color:var(--cyan);}.stat-value.green{color:var(--green);}.stat-value.orange{color:var(--orange);}.stat-value.yellow{color:var(--yellow);}
+.stat-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);margin-top:4px;}
+
+/* ACTION LOG */
+.log-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden;}
+.log-header{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface2);cursor:pointer;user-select:none;}
+.log-header-left{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);}
+.log-toggle{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer;}
+.log-body{max-height:280px;overflow-y:auto;padding:8px 0;}
+.log-entry{display:flex;gap:12px;align-items:flex-start;padding:5px 16px;border-bottom:1px solid rgba(28,46,64,0.3);font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;}
+.log-entry:last-child{border-bottom:none;}
+.log-time{color:var(--muted);white-space:nowrap;min-width:70px;font-size:10px;padding-top:1px;}
+.log-icon{min-width:16px;text-align:center;}
+.log-msg{color:var(--muted2);flex:1;}
+.log-msg.ok{color:var(--green);}
+.log-msg.err{color:var(--red);}
+.log-msg.warn{color:var(--yellow);}
+.log-msg.info{color:var(--cyan);}
+.log-msg.data{color:#a78bfa;}
+.log-badge{font-size:9px;padding:1px 7px;border-radius:3px;margin-left:8px;white-space:nowrap;}
+.badge-api{background:rgba(0,229,255,0.1);color:var(--cyan);border:1px solid rgba(0,229,255,0.2);}
+.badge-filter{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);}
+.badge-score{background:rgba(0,255,157,0.1);color:var(--green);border:1px solid rgba(0,255,157,0.2);}
+.badge-warn{background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.2);}
+
+/* PROGRESS */
+.progress-wrap{height:3px;background:var(--border);border-radius:2px;margin-bottom:20px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;width:0%;transition:width 0.4s ease;box-shadow:0 0 12px rgba(0,229,255,0.5);}
+
+/* ERROR BOX */
+.error-box{background:rgba(255,23,68,0.06);border:1px solid rgba(255,23,68,0.3);border-radius:10px;padding:0;margin-bottom:20px;overflow:hidden;display:none;}
+.error-title{background:rgba(255,23,68,0.12);padding:12px 18px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--red);border-bottom:1px solid rgba(255,23,68,0.2);display:flex;align-items:center;gap:10px;}
+.error-body{padding:16px 18px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#ff6b7a;line-height:1.9;}
+.error-row{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,23,68,0.1);}
+.error-row:last-child{border-bottom:none;}
+.err-label{color:var(--red);min-width:160px;font-weight:600;}
+.err-val{color:#ff9aaa;}
+.fix-section{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,23,68,0.2);}
+.fix-title{color:var(--yellow);font-weight:700;margin-bottom:8px;}
+.fix-row{display:flex;gap:8px;padding:3px 0;color:#ffd6a5;}
+.fix-num{color:var(--yellow);min-width:20px;}
+
+/* LAYOUT */
+.columns{display:grid;grid-template-columns:1fr 400px;gap:18px;}
+@media(max-width:960px){.columns{grid-template-columns:1fr;}}
+
+/* SECTION HEADERS */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.section-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2);display:flex;align-items:center;gap:8px;}
+.section-title .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+.section-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:3px 10px;border-radius:20px;border:1px solid var(--border);}
+
+/* STOCKS TABLE */
+.stocks-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.table-head{display:grid;grid-template-columns:44px 80px 1fr 95px 85px 95px 110px;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.th{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.stocks-list{max-height:560px;overflow-y:auto;}
+.stock-row{display:grid;grid-template-columns:44px 80px 1fr 95px 85px 95px 110px;gap:6px;padding:12px 16px;border-bottom:1px solid rgba(28,46,64,0.4);align-items:center;cursor:pointer;opacity:0;transform:translateX(-8px);animation:rowIn 0.4s forwards;transition:background 0.2s;}
+.stock-row:hover{background:rgba(255,255,255,0.025);}
+.stock-row.top-pick{background:rgba(0,255,157,0.025);border-left:2px solid var(--green);}
+.stock-row:last-child{border-bottom:none;}
+@keyframes rowIn{to{opacity:1;transform:translateX(0);}}
+.row-rank{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);text-align:center;}
+.row-ticker{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#fff;}
+.row-name{font-size:12px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-price{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--text);}
+.row-pct{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;padding:3px 7px;border-radius:5px;text-align:center;}
+.pct-hot{color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
+.pct-warm{color:var(--yellow);background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.2);}
+.pct-mild{color:var(--cyan);background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);}
+.row-vol{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted2);}
+.row-sector{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.sector-tech{color:var(--cyan);border-color:rgba(0,229,255,0.2);background:rgba(0,229,255,0.06);}
+.sector-fin{color:var(--green);border-color:rgba(0,255,157,0.2);background:rgba(0,255,157,0.06);}
+.sector-energy{color:var(--orange);border-color:rgba(255,112,67,0.2);background:rgba(255,112,67,0.06);}
+.sector-cons{color:var(--yellow);border-color:rgba(255,214,0,0.2);background:rgba(255,214,0,0.06);}
+.sector-other{color:var(--muted2);border-color:var(--border);background:var(--surface2);}
+
+/* SCORE MODAL */
+.score-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.score-panel.open{display:flex;}
+.score-modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:90%;max-width:560px;overflow:hidden;animation:modalIn 0.3s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
+.score-modal-header{background:var(--surface2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.score-modal-title{font-size:18px;font-weight:800;color:#fff;}
+.score-modal-close{background:none;border:none;color:var(--muted2);font-size:20px;cursor:pointer;padding:0 4px;}
+.score-modal-close:hover{color:#fff;}
+.score-modal-body{padding:20px;max-height:70vh;overflow-y:auto;}
+.score-section{margin-bottom:16px;}
+.score-section-title{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.score-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.score-metric{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.score-metric-label{font-size:12px;color:var(--muted2);min-width:140px;}
+.score-metric-bar-bg{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+.score-metric-bar{height:100%;border-radius:4px;transition:width 0.8s ease;}
+.score-metric-val{font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:50px;text-align:right;}
+.score-total{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:8px;margin-top:10px;border:1px solid var(--border2);}
+.score-total-label{font-size:13px;font-weight:700;}
+.score-total-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--green);}
+.signal-tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;margin:3px;border:1px solid;}
+.sig-bull{color:var(--green);border-color:rgba(0,255,157,0.3);background:rgba(0,255,157,0.06);}
+.sig-warn{color:var(--yellow);border-color:rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);}
+.sig-neu{color:var(--muted2);border-color:var(--border);background:var(--surface2);}
+
+/* BLOCKED */
+.blocked-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:18px;}
+.blocked-list{max-height:160px;overflow-y:auto;padding:4px 0;}
+.blocked-row{display:grid;grid-template-columns:24px 70px 1fr 90px;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(28,46,64,0.3);align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;opacity:0;animation:rowIn 0.4s forwards;}
+.blocked-row:last-child{border-bottom:none;}
+.bx{color:var(--red);font-weight:700;}
+.bt{color:rgba(255,255,255,0.35);font-weight:700;}
+.br{color:var(--muted);font-size:10px;}
+.bs{font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);text-align:center;}
+
+/* RIGHT PANEL */
+.right-panel{display:flex;flex-direction:column;gap:16px;}
+.panel-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.panel-title{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.filter-rule{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.4);font-size:12px;}
+.filter-rule:last-child{border-bottom:none;}
+.rule-icon{min-width:20px;text-align:center;}
+.rule-text{flex:1;color:var(--muted2);}
+.rule-on{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;border-radius:3px;color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
+
+/* SCORING LEGEND */
+.score-legend-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.3);font-size:12px;}
+.score-legend-row:last-child{border-bottom:none;}
+.legend-weight{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;min-width:36px;color:var(--cyan);}
+.legend-label{flex:1;color:var(--muted2);}
+.legend-source{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:3px;border:1px solid var(--border);}
+
+/* SECTOR BARS */
+.sector-bar-row{margin-bottom:10px;}
+.sector-bar-label{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;color:var(--muted2);}
+.sector-bar-label span:last-child{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);}
+.sector-bar-bg{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+.sector-bar-fill{height:100%;border-radius:3px;transition:width 1s ease;width:0%;}
+
+/* API STATUS */
+.api-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.3);font-size:11px;}
+.api-row:last-child{border-bottom:none;}
+.api-name{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted2);flex:1;}
+.api-calls{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);}
+.api-status{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;}
+.api-ok{color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
+.api-err{color:var(--red);background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.2);}
+.api-pend{color:var(--muted);background:var(--surface2);border:1px solid var(--border);}
+
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+.footer{text-align:center;padding:24px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;border-top:1px solid var(--border);margin-top:24px;line-height:1.8;}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div>
+      <div class="logo-text">StockScan AI</div>
+      <div class="logo-sub">Live Market Intelligence</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div id="marketBadge" class="market-badge market-pre">CHECKING...</div>
+    <div class="live-indicator"><div class="live-dot"></div>FMP LIVE</div>
+    <div class="clock" id="clock">--:--:--</div>
+    <button class="btn-refresh" id="refreshBtn" onclick="loadData()">⟳ REFRESH</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="disclaimer">⚠ EDUCATIONAL PURPOSE ONLY — Real market data for informational use. Not financial advice. Always do your own research before trading.</div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Gainers Fetched</div>
+      <div class="stat-value cyan" id="statFetched">—</div>
+      <div class="stat-sub" id="statFetchedSub">from FMP API</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">After Filters</div>
+      <div class="stat-value green" id="statPassed">—</div>
+      <div class="stat-sub">passed all rules</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Blocked</div>
+      <div class="stat-value orange" id="statBlocked">—</div>
+      <div class="stat-sub">sector/quality filtered</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Top Pick Score</div>
+      <div class="stat-value yellow" id="statTopScore">—</div>
+      <div class="stat-sub">out of 100</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">API Calls Used</div>
+      <div class="stat-value cyan" id="statCalls">—</div>
+      <div class="stat-sub">of 250/day free tier</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Run Time</div>
+      <div class="stat-value" id="statRunTime">—</div>
+      <div class="stat-sub">total scan duration</div>
+    </div>
+  </div>
+
+  <!-- ACTION LOG -->
+  <div class="log-panel">
+    <div class="log-header" onclick="toggleLog()">
+      <div class="log-header-left">
+        <span style="color:var(--cyan);">▶</span>
+        ACTION LOG — Every Step This App Takes
+        <span id="logCount" style="color:var(--muted);font-size:10px;"></span>
+      </div>
+      <span class="log-toggle" id="logToggleBtn">▲ COLLAPSE</span>
+    </div>
+    <div class="log-body" id="logBody"></div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap"><div class="progress-fill" id="progressFill"></div></div>
+
+  <!-- ERROR BOX -->
+  <div class="error-box" id="errorBox">
+    <div class="error-title">⚠ API ERROR — Specific Diagnosis</div>
+    <div class="error-body" id="errorBody"></div>
+  </div>
+
+  <!-- COLUMNS -->
+  <div class="columns">
+    <div>
+      <!-- STOCKS -->
+      <div class="section-header">
+        <div class="section-title"><span class="dot"></span>Live Top Gainers — Filtered &amp; Scored</div>
+        <div class="section-count" id="passedCount">Loading...</div>
+      </div>
+      <div class="stocks-panel">
+        <div class="table-head">
+          <div class="th">RANK</div>
+          <div class="th">TICKER</div>
+          <div class="th">COMPANY</div>
+          <div class="th">PRICE</div>
+          <div class="th">CHANGE%</div>
+          <div class="th">VOLUME</div>
+          <div class="th">SECTOR</div>
+        </div>
+        <div class="stocks-list" id="stocksList">
+          <div style="padding:50px;text-align:center;color:var(--muted);font-size:13px;font-family:'IBM Plex Mono',monospace;">
+            📡 Connecting to Financial Modeling Prep...
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOCKED -->
+      <div style="margin-top:18px;">
+        <div class="section-header">
+          <div class="section-title" style="color:rgba(255,23,68,0.6);">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);display:inline-block;"></span>
+            Blocked — Healthcare / Biotech / Pharma / Quality Fails
+          </div>
+          <div class="section-count" id="blockedCount">0 removed</div>
+        </div>
+        <div class="blocked-panel">
+          <div class="blocked-list" id="blockedList">
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:11px;font-family:'IBM Plex Mono',monospace;">Awaiting scan...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+
+      <!-- SCORING LEGEND -->
+      <div class="panel-card">
+        <div class="panel-title">🧠 How Top 5 Are Scored (Per Stock)</div>
+        <div class="score-legend-row">
+          <span class="legend-weight">30pt</span>
+          <span class="legend-label">% Gain momentum (sweet spot 3–10%)</span>
+          <span class="legend-source">FMP Gainers</span>
+        </div>
+        <div class="score-legend-row">
+          <span class="legend-weight">25pt</span>
+          <span class="legend-label">Volume vs typical (spike = conviction)</span>
+          <span class="legend-source">FMP Gainers</span>
+        </div>
+        <div class="score-legend-row">
+          <span class="legend-weight">20pt</span>
+          <span class="legend-label">Sector strength (Tech/Finance > others)</span>
+          <span class="legend-source">FMP Profile</span>
+        </div>
+        <div class="score-legend-row">
+          <span class="legend-weight">15pt</span>
+          <span class="legend-label">Market cap (mid-large cap preferred)</span>
+          <span class="legend-source">FMP Profile</span>
+        </div>
+        <div class="score-legend-row">
+          <span class="legend-weight">10pt</span>
+          <span class="legend-label">Price range quality ($10–$500)</span>
+          <span class="legend-source">FMP Gainers</span>
+        </div>
+        <div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px;">CLICK ANY ROW to see full score breakdown</div>
+          <div style="font-size:11px;color:var(--muted);">Top 5 = highest composite scores after all filters pass</div>
+        </div>
+      </div>
+
+      <!-- FILTER RULES -->
+      <div class="panel-card">
+        <div class="panel-title">⚙ Active Filter Rules</div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Healthcare sector</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Biotechnology</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Pharmaceutical</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">💰</span><span class="rule-text">Price &gt; $5 (no penny stocks)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">📊</span><span class="rule-text">Volume &gt; 500,000 shares</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">📈</span><span class="rule-text">Gain capped at 15% (blowoff protection)</span><span class="rule-on">ON</span></div>
+      </div>
+
+      <!-- API STATUS -->
+      <div class="panel-card">
+        <div class="panel-title">🔗 API Resources Used This Run</div>
+        <div class="api-row">
+          <div class="api-name">FMP /stock_market/gainers</div>
+          <div class="api-calls" id="callGainers">1 call</div>
+          <div class="api-status api-pend" id="statusGainers">PENDING</div>
+        </div>
+        <div class="api-row">
+          <div class="api-name">FMP /profile/{symbol}</div>
+          <div class="api-calls" id="callProfiles">— calls</div>
+          <div class="api-status api-pend" id="statusProfiles">PENDING</div>
+        </div>
+        <div class="api-row">
+          <div class="api-name">Total API calls this run</div>
+          <div class="api-calls" id="callTotal">—</div>
+          <div class="api-status api-pend" id="statusTotal">—</div>
+        </div>
+        <div class="api-row">
+          <div class="api-name">Last refreshed</div>
+          <div class="api-calls" id="lastUpdated" style="color:var(--muted2);font-size:10px;">—</div>
+          <div></div>
+        </div>
+      </div>
+
+      <!-- SECTOR BREAKDOWN -->
+      <div class="panel-card">
+        <div class="panel-title">📊 Sector Breakdown (Passed)</div>
+        <div id="sectorBreakdown"><div style="color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace;">Awaiting data...</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- SCORE MODAL -->
+<div class="score-panel" id="scorePanel" onclick="closeModal(event)">
+  <div class="score-modal">
+    <div class="score-modal-header">
+      <div>
+        <div class="score-modal-title" id="modalTitle">TICKER</div>
+        <div style="font-size:12px;color:var(--muted2);margin-top:2px;" id="modalSubtitle">Company Name</div>
+      </div>
+      <button class="score-modal-close" onclick="document.getElementById('scorePanel').classList.remove('open')">✕</button>
+    </div>
+    <div class="score-modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="footer">STOCKSCAN AI · FINANCIAL MODELING PREP API · DATA MAY BE DELAYED<br>⚠ NOT FINANCIAL ADVICE · FOR EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY</div>
+
+<script>
+const API_KEY = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
+const EXCLUDED = ['healthcare','biotechnology','pharmaceutical','biotech','medical devices','drug manufacturers','drug','clinical','diagnostics'];
+
+let logVisible = true;
+let runStart = 0;
+let apiCallCount = 0;
+let stockScores = {};
+
+// ── CLOCK ──────────────────────────────────────────────────
+function updateClock() {
+  const est = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  document.getElementById('clock').textContent =
+    String(est.getHours()).padStart(2,'0') + ':' +
+    String(est.getMinutes()).padStart(2,'0') + ':' +
+    String(est.getSeconds()).padStart(2,'0') + ' EST';
+  const day = est.getDay(), hm = est.getHours()*60 + est.getMinutes();
+  const b = document.getElementById('marketBadge');
+  if(day===0||day===6){b.className='market-badge market-closed';b.textContent='WEEKEND';}
+  else if(hm<570){b.className='market-badge market-pre';b.textContent='PRE-MARKET';}
+  else if(hm<960){b.className='market-badge market-open';b.textContent='● MARKET OPEN';}
+  else{b.className='market-badge market-closed';b.textContent='AFTER-HOURS';}
+}
+setInterval(updateClock,1000); updateClock();
+
+// ── LOG ────────────────────────────────────────────────────
+function addLog(icon, msg, type='', badge='', badgeClass='') {
+  const body = document.getElementById('logBody');
+  const now = new Date();
+  const ts = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0')+'.'+String(now.getMilliseconds()).padStart(3,'0');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${ts}</span><span class="log-icon">${icon}</span><span class="log-msg ${type}">${msg}${badge?`<span class="log-badge ${badgeClass}">${badge}</span>`:''}</span>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  const entries = body.querySelectorAll('.log-entry').length;
+  document.getElementById('logCount').textContent = `(${entries} events)`;
+}
+
+function toggleLog() {
+  logVisible = !logVisible;
+  document.getElementById('logBody').style.display = logVisible?'block':'none';
+  document.getElementById('logToggleBtn').textContent = logVisible?'▲ COLLAPSE':'▼ EXPAND';
+}
+
+// ── PROGRESS ───────────────────────────────────────────────
+function setProgress(p){ document.getElementById('progressFill').style.width=p+'%'; }
+
+// ── FORMAT HELPERS ─────────────────────────────────────────
+function fmtVol(v){if(!v)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v.toString();}
+function fmtMktCap(v){if(!v)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(2)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
+function sectorClass(s){if(!s)return'sector-other';s=s.toLowerCase();if(s.includes('tech')||s.includes('soft')||s.includes('semi')||s.includes('commun'))return'sector-tech';if(s.includes('financ')||s.includes('bank')||s.includes('crypto')||s.includes('insur'))return'sector-fin';if(s.includes('energy')||s.includes('oil')||s.includes('gas')||s.includes('util'))return'sector-energy';if(s.includes('consumer')||s.includes('retail')||s.includes('real estate')||s.includes('indust'))return'sector-cons';return'sector-other';}
+function pctClass(p){return p>=5?'pct-hot':p>=2?'pct-warm':'pct-mild';}
+function isExcluded(sector,industry){const s=(sector||'').toLowerCase(),i=(industry||'').toLowerCase();return EXCLUDED.some(x=>s.includes(x)||i.includes(x));}
+
+// ── SCORING ENGINE ─────────────────────────────────────────
+function scoreStock(stock) {
+  const pct   = stock.changesPercentage;
+  const vol   = stock.volume;
+  const price = stock.price;
+  const cap   = stock.mktCap;
+  const sec   = (stock.sector||'').toLowerCase();
+
+  // 1. Momentum score (30pts) — sweet spot is 3-10%
+  let momentumScore = 0;
+  let momentumNote = '';
+  if(pct>=3&&pct<=10){momentumScore=30;momentumNote='Ideal range (3–10%)';}
+  else if(pct>10&&pct<=15){momentumScore=18;momentumNote='High but within cap (>10%)';}
+  else if(pct>=1&&pct<3){momentumScore=15;momentumNote='Mild gain (<3%)';}
+  else{momentumScore=5;momentumNote='Outside preferred range';}
+
+  // 2. Volume score (25pts)
+  let volumeScore = 0;
+  let volumeNote = '';
+  if(vol>=50e6){volumeScore=25;volumeNote='Massive volume spike (50M+)';}
+  else if(vol>=20e6){volumeScore=22;volumeNote='Very high volume (20M+)';}
+  else if(vol>=5e6){volumeScore=17;volumeNote='Strong volume (5M+)';}
+  else if(vol>=1e6){volumeScore=10;volumeNote='Moderate volume (1M+)';}
+  else{volumeScore=3;volumeNote='Low volume';}
+
+  // 3. Sector score (20pts)
+  let sectorScore = 0;
+  let sectorNote = '';
+  if(sec.includes('tech')||sec.includes('semi')||sec.includes('soft')){sectorScore=20;sectorNote='Technology — highest momentum sector';}
+  else if(sec.includes('financ')||sec.includes('bank')||sec.includes('crypto')){sectorScore=18;sectorNote='Financial — strong momentum sector';}
+  else if(sec.includes('energy')||sec.includes('oil')){sectorScore=15;sectorNote='Energy — moderate momentum';}
+  else if(sec.includes('consumer')||sec.includes('retail')){sectorScore=12;sectorNote='Consumer — average momentum';}
+  else if(sec.includes('commun')||sec.includes('media')){sectorScore=14;sectorNote='Communication — decent momentum';}
+  else{sectorScore=8;sectorNote='Other sector';}
+
+  // 4. Market cap score (15pts)
+  let capScore = 0;
+  let capNote = '';
+  if(cap>=10e9){capScore=15;capNote='Large cap (>$10B) — institutional liquidity';}
+  else if(cap>=2e9){capScore=13;capNote='Mid cap ($2B–$10B) — good balance';}
+  else if(cap>=500e6){capScore=9;capNote='Small cap ($500M–$2B)';}
+  else if(cap>0){capScore=5;capNote='Micro cap (<$500M) — higher risk';}
+  else{capScore=7;capNote='Cap data unavailable';}
+
+  // 5. Price quality score (10pts)
+  let priceScore = 0;
+  let priceNote = '';
+  if(price>=20&&price<=500){priceScore=10;priceNote='Ideal price range ($20–$500)';}
+  else if(price>=10&&price<20){priceScore=7;priceNote='Acceptable ($10–$20)';}
+  else if(price>500){priceScore=8;priceNote='High-priced stock (>$500)';}
+  else{priceScore=4;priceNote='Near penny stock range';}
+
+  const total = momentumScore+volumeScore+sectorScore+capScore+priceScore;
+
+  return {
+    total,
+    breakdown:{
+      momentum:{score:momentumScore,max:30,note:momentumNote,pct},
+      volume:{score:volumeScore,max:25,note:volumeNote,vol},
+      sector:{score:sectorScore,max:20,note:sectorNote,sec:stock.sector},
+      marketCap:{score:capScore,max:15,note:capNote,cap},
+      price:{score:priceScore,max:10,note:priceNote,price}
+    }
+  };
+}
+
+// ── SPECIFIC ERROR DIAGNOSIS ───────────────────────────────
+function diagnoseError(status, message, context) {
+  const box = document.getElementById('errorBox');
+  const body = document.getElementById('errorBody');
+  box.style.display = 'block';
+
+  let diagnosis = '';
+  let fixes = [];
+  let what = '';
+  let why = '';
+
+  if(status===403){
+    what = 'HTTP 403 Forbidden — Server refused your request';
+    why = 'Your API key exists but the endpoint returned 403. This was caused by using the old legacy URL (/stock_market/gainers). The app now uses the correct URL (/api/v3/gainers). If you still see 403, your daily 250-call limit may be exhausted.';
+    fixes = [
+      'Paste this URL directly in a new browser tab to test your key live: https://financialmodelingprep.com/api/v3/gainers?apikey=' + API_KEY,
+      'If the browser tab shows stock data → your key works, the issue is CORS (use python3 server)',
+      'If the browser tab shows {"Error Message":"..."} → your daily 250-call limit is exhausted, resets at midnight UTC',
+      'If the browser tab shows 401 → your key is invalid, get a fresh one at financialmodelingprep.com/developer/docs',
+      'Log into financialmodelingprep.com → Dashboard → check your API usage meter'
+    ];
+  } else if(status===401){
+    what = 'HTTP 401 Unauthorized — Invalid API Key';
+    why = 'The API key provided is not recognized by FMP servers.';
+    fixes = [
+      'Log in to financialmodelingprep.com → go to Dashboard → copy your key again',
+      'Make sure there are no spaces or extra characters in the API key',
+      'The key may have been regenerated — use the latest one from your FMP dashboard'
+    ];
+  } else if(status===429){
+    what = 'HTTP 429 Too Many Requests — Rate Limited';
+    why = 'You have exceeded the API call limit. Free tier = 250 calls/day. Each scan uses approximately 31 calls.';
+    fixes = [
+      'Wait until midnight UTC for your daily limit to reset',
+      'You can check your usage at financialmodelingprep.com/developer/docs',
+      'Each run of this app uses 1 (gainers) + up to 30 (profiles) = 31 API calls',
+      'With 250 calls/day free, you can run this scanner ~8 times per day maximum'
+    ];
+  } else if(status===0||message.includes('CORS')||message.includes('NetworkError')||message.includes('Failed to fetch')){
+    what = 'CORS / Network Error — Browser blocked the request';
+    why = 'Your browser blocked the API call because the HTML file is being opened directly from your filesystem (file://) rather than a web server. This is a browser security policy, not an API issue.';
+    fixes = [
+      'Open Terminal and run: cd ~/Downloads && python3 -m http.server 8080',
+      'Then go to: http://localhost:8080/index.html in Chrome',
+      'OR install VS Code + Live Server extension and click "Go Live"',
+      'Do NOT open the HTML file by double-clicking — always use a local server',
+      'Chrome is more permissive than Safari for local files — try Chrome first'
+    ];
+  } else if(status===404){
+    what = 'HTTP 404 Not Found — Endpoint does not exist';
+    why = 'The API URL may have changed or the symbol does not exist.';
+    fixes = [
+      'Check financialmodelingprep.com/developer/docs for the latest endpoint URLs',
+      'Verify the stock symbol is a valid US ticker'
+    ];
+  } else if(message.includes('market')||message.includes('empty')||message.includes('No gainers')){
+    what = 'Empty Response — No gainers data available';
+    why = 'The API returned an empty or null response. This usually means the market is closed.';
+    fixes = [
+      'US markets are open Monday–Friday, 9:30 AM – 4:00 PM EST only',
+      'Check the market status badge at the top of this page',
+      'Pre-market data (before 9:30 AM) may have limited gainers',
+      'Wait until market opens at 9:30 AM EST and refresh'
+    ];
+  } else {
+    what = `HTTP ${status||'Unknown'} Error`;
+    why = message;
+    fixes = [
+      'Open browser DevTools (F12 or Cmd+Option+I on Mac) → Network tab → look for red failed requests',
+      'Check your internet connection',
+      'Try refreshing in 30 seconds'
+    ];
+  }
+
+  let fixHtml = fixes.map((f,i)=>`<div class="fix-row"><span class="fix-num">${i+1}.</span><span>${f}</span></div>`).join('');
+
+  body.innerHTML = `
+    <div class="error-row"><span class="err-label">What happened:</span><span class="err-val">${what}</span></div>
+    <div class="error-row"><span class="err-label">Why it happened:</span><span class="err-val">${why}</span></div>
+    <div class="error-row"><span class="err-label">HTTP Status Code:</span><span class="err-val">${status||'N/A (Network error)'}</span></div>
+    <div class="error-row"><span class="err-label">Context:</span><span class="err-val">${context}</span></div>
+    <div class="error-row"><span class="err-label">Your API Key:</span><span class="err-val">${API_KEY.slice(0,8)}...${API_KEY.slice(-4)} (${API_KEY.length} chars)</span></div>
+    <div class="error-row"><span class="err-label">Timestamp:</span><span class="err-val">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})} EST</span></div>
+    <div class="fix-section">
+      <div class="fix-title">🔧 How to Fix This:</div>
+      ${fixHtml}
+    </div>
+  `;
+
+  addLog('❌', `${what}`, 'err');
+  addLog('🔍', `Cause: ${why}`, 'warn');
+}
+
+// ── MAIN LOAD ──────────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent='⟳ SCANNING...';
+  runStart = Date.now();
+  apiCallCount = 0;
+  stockScores = {};
+
+  // Clear
+  document.getElementById('errorBox').style.display='none';
+  document.getElementById('stocksList').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;font-family:\'IBM Plex Mono\',monospace;">Scanning...</div>';
+  document.getElementById('blockedList').innerHTML='';
+  document.getElementById('logBody').innerHTML='';
+  ['statFetched','statPassed','statBlocked','statTopScore','statCalls','statRunTime'].forEach(id=>{document.getElementById(id).textContent='—';});
+  ['statusGainers','statusProfiles','statusTotal'].forEach(id=>{const el=document.getElementById(id);el.className='api-status api-pend';el.textContent='PENDING';});
+  document.getElementById('callProfiles').textContent='— calls';
+  document.getElementById('callTotal').textContent='—';
+  setProgress(5);
+
+  addLog('🚀','Scan started','info','NEW RUN','badge-api');
+  addLog('📋','Active filters: Exclude Healthcare, Biotech, Pharma | Min price $5 | Min volume 500K | Max gain 15%','');
+  addLog('🧮','Scoring weights: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt max','data');
+  addLog('🌐','Preparing API call #1 → FMP /api/v3/gainers (free-tier correct endpoint)','info','API CALL','badge-api');
+
+  try {
+    // ── STEP 1: Gainers ────────────────────────────────────
+    setProgress(10);
+    const gainersUrl = `https://financialmodelingprep.com/api/v3/gainers?apikey=${API_KEY}`;
+    addLog('📡',`GET ${gainersUrl.replace(API_KEY,'[KEY]')}`, 'info');
+    addLog('ℹ️','Using correct free-tier endpoint: /api/v3/gainers (not legacy /stock_market/gainers)','info');
+
+    let gainersRes;
+    try {
+      gainersRes = await fetch(gainersUrl);
+    } catch(netErr) {
+      diagnoseError(0, netErr.message, 'Fetching /api/v3/gainers — likely CORS (open via python3 server, not file://)');
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH';
+      addLog('💡','Fix: Terminal → cd ~/Downloads && python3 -m http.server 8080 → Chrome → http://localhost:8080/index.html','warn');
+      return;
+    }
+
+    apiCallCount++;
+    document.getElementById('callTotal').textContent = apiCallCount;
+    addLog('📬',`Response received — HTTP ${gainersRes.status} ${gainersRes.statusText}`, gainersRes.ok?'ok':'err');
+
+    if(!gainersRes.ok){
+      const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='ERROR '+gainersRes.status;
+      diagnoseError(gainersRes.status, gainersRes.statusText, 'Fetching /api/v3/gainers');
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
+    }
+
+    let gainersData = await gainersRes.json();
+
+    if(gainersData['Error Message']){
+      const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='API ERR';
+      diagnoseError(403, gainersData['Error Message'], 'FMP returned Error Message in body — check your plan at financialmodelingprep.com/developer/docs');
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
+    }
+
+    // Fallback to /actives if gainers empty (pre-market or closed)
+    if(!Array.isArray(gainersData)||gainersData.length===0){
+      addLog('⚠️','Gainers empty — trying /api/v3/actives as fallback...','warn');
+      const activesRes=await fetch(`https://financialmodelingprep.com/api/v3/actives?apikey=${API_KEY}`);
+      apiCallCount++;
+      if(activesRes.ok){ gainersData=await activesRes.json(); }
+      if(!Array.isArray(gainersData)||gainersData.length===0){
+        diagnoseError(200,'No market data available from /gainers or /actives','US market is likely closed. Market hours: Mon–Fri 9:30AM–4:00PM EST. Try again during market hours.');
+        setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
+      }
+      addLog('✅',`Fallback /actives returned ${gainersData.length} stocks`,'ok');
+    }
+
+    const el1=document.getElementById('statusGainers'); el1.className='api-status api-ok'; el1.textContent='OK ✓';
+    addLog('✅',`Gainers endpoint success — ${gainersData.length} stocks returned`,'ok','GAINERS','badge-api');
+    document.getElementById('statFetched').textContent = gainersData.length;
+    document.getElementById('statFetchedSub').textContent = `${gainersData.length} total gainers today`;
+
+    const allStocks = gainersData.slice(0,30);
+    addLog('✂️',`Sliced to top ${allStocks.length} stocks for profile lookup (API call budget control)`,'');
+    setProgress(20);
+
+    // ── STEP 2: Profiles ───────────────────────────────────
+    addLog('🏢',`Starting company profile lookups — ${allStocks.length} API calls incoming`,'info','PROFILES','badge-api');
+    const profileCache = {};
+    const batchSize = 5;
+    let profileOk=0, profileFail=0;
+
+    for(let i=0;i<allStocks.length;i+=batchSize){
+      const batch = allStocks.slice(i,i+batchSize);
+      setProgress(20 + ((i/allStocks.length)*55));
+      addLog('📦',`Profile batch ${Math.floor(i/batchSize)+1}/${Math.ceil(allStocks.length/batchSize)}: fetching ${batch.map(s=>s.symbol).join(', ')}`,'data');
+
+      await Promise.all(batch.map(async(stock)=>{
+        try{
+          const url=`https://financialmodelingprep.com/api/v3/profile/${stock.symbol}?apikey=${API_KEY}`;
+          const res=await fetch(url);
+          apiCallCount++;
+          if(res.ok){
+            const d=await res.json();
+            if(Array.isArray(d)&&d.length>0){
+              profileCache[stock.symbol]=d[0];
+              profileOk++;
+              addLog('✓',`${stock.symbol} → Sector: "${d[0].sector||'—'}" | Industry: "${d[0].industry||'—'}" | MktCap: ${fmtMktCap(d[0].mktCap)}`,'ok');
+            } else {
+              addLog('⚠',`${stock.symbol} → Profile returned empty array`,'warn');
+              profileFail++;
+            }
+          } else {
+            addLog('✗',`${stock.symbol} → Profile HTTP ${res.status}`,'err');
+            profileFail++;
+          }
+        }catch(e){
+          addLog('✗',`${stock.symbol} → Network error: ${e.message}`,'err');
+          profileFail++;
+        }
+        document.getElementById('callTotal').textContent=apiCallCount;
+        document.getElementById('callProfiles').textContent=`${apiCallCount-1} calls`;
+      }));
+    }
+
+    const el2=document.getElementById('statusProfiles');
+    el2.className=profileFail===0?'api-status api-ok':'api-status api-pend';
+    el2.textContent=profileFail===0?`OK ✓ (${profileOk})`:`${profileOk} ok / ${profileFail} failed`;
+    addLog('📊',`Profile fetch complete — ${profileOk} success, ${profileFail} failed/empty`,'ok');
+    setProgress(78);
+
+    // ── STEP 3: Filter + Score ─────────────────────────────
+    addLog('🔍','Applying filters and scoring each stock...','info','FILTERS','badge-filter');
+    const passedStocks=[], blockedStocks=[];
+
+    for(const stock of allStocks){
+      const profile = profileCache[stock.symbol]||{};
+      const sector  = profile.sector||stock.sector||'';
+      const industry= profile.industry||'';
+      const price   = parseFloat(stock.price)||0;
+      const vol     = parseInt(stock.volume)||0;
+      const pct     = parseFloat(stock.changesPercentage)||0;
+      const mktCap  = profile.mktCap||0;
+
+      const enriched = {
+        symbol:stock.symbol, name:profile.companyName||stock.name||stock.symbol,
+        price, changesPercentage:pct, volume:vol, sector:sector||'Unknown',
+        industry, mktCap
+      };
+
+      if(isExcluded(sector,industry)){
+        blockedStocks.push({...enriched,blockReason:`Sector: ${sector||industry||'Healthcare/Biotech/Pharma'}`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" matches exclusion list`,'err','FILTERED','badge-filter');
+      } else if(price<5){
+        blockedStocks.push({...enriched,blockReason:`Penny stock ($${price.toFixed(2)} < $5)`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Price $${price.toFixed(2)} below $5 minimum`,'err','FILTERED','badge-filter');
+      } else if(vol<500000){
+        blockedStocks.push({...enriched,blockReason:`Low volume (${fmtVol(vol)} < 500K)`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Volume ${fmtVol(vol)} below 500K minimum`,'err','FILTERED','badge-filter');
+      } else if(pct>15){
+        blockedStocks.push({...enriched,blockReason:`Gain ${pct.toFixed(1)}% exceeds 15% blowoff cap`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — Gain ${pct.toFixed(1)}% exceeds 15% blowoff protection cap`,'err','FILTERED','badge-filter');
+      } else {
+        const scored = scoreStock(enriched);
+        stockScores[stock.symbol] = scored;
+        enriched.score = scored.total;
+        passedStocks.push(enriched);
+        addLog('✅',`PASSED ${stock.symbol} — Score: ${scored.total}/100 | ${pct.toFixed(1)}% gain | Vol ${fmtVol(vol)} | ${sector||'—'}`,'ok','SCORED','badge-score');
+      }
+    }
+
+    setProgress(90);
+    passedStocks.sort((a,b)=>b.score-a.score);
+
+    // ── STATS UPDATE ───────────────────────────────────────
+    document.getElementById('statPassed').textContent=passedStocks.length;
+    document.getElementById('statBlocked').textContent=blockedStocks.length;
+    document.getElementById('passedCount').textContent=`${passedStocks.length} stocks`;
+    document.getElementById('blockedCount').textContent=`${blockedStocks.length} removed`;
+    if(passedStocks.length>0) document.getElementById('statTopScore').textContent=passedStocks[0].score;
+    document.getElementById('statCalls').textContent=apiCallCount;
+    document.getElementById('callTotal').textContent=apiCallCount;
+    const el3=document.getElementById('statusTotal');
+    el3.className='api-status api-ok'; el3.textContent=`${apiCallCount} / 250`;
+    document.getElementById('lastUpdated').textContent=
+      new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'})+' EST';
+
+    addLog('🏆',`Top 5 by score: ${passedStocks.slice(0,5).map(s=>`${s.symbol}(${s.score})`).join(' › ')}`,'info','TOP 5','badge-score');
+    addLog('📧',`In your Make workflow, these ${passedStocks.slice(0,5).length} tickers would be sent to OpenAI then emailed to you`,'info');
+
+    renderStocks(passedStocks);
+    renderBlocked(blockedStocks);
+    renderSectors(passedStocks);
+
+    const elapsed = ((Date.now()-runStart)/1000).toFixed(1);
+    document.getElementById('statRunTime').textContent=elapsed+'s';
+    addLog('⏱',`Scan complete in ${elapsed}s — ${apiCallCount} API calls used (${250-apiCallCount} remaining today)`,'ok');
+
+    setProgress(100);
+    setTimeout(()=>setProgress(0),2000);
+
+  } catch(err) {
+    setProgress(0);
+    diagnoseError(0, err.message, 'Unexpected error in main scan loop');
+    addLog('💥',`Unexpected error: ${err.message}`,'err');
+  }
+
+  btn.disabled=false; btn.textContent='⟳ REFRESH';
+}
+
+// ── RENDER ─────────────────────────────────────────────────
+function renderStocks(stocks) {
+  const list = document.getElementById('stocksList');
+  list.innerHTML='';
+  if(stocks.length===0){
+    list.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;font-family:\'IBM Plex Mono\',monospace;">No stocks passed all filters.</div>';
+    return;
+  }
+  stocks.forEach((s,i)=>{
+    const isTop=i<5;
+    const row=document.createElement('div');
+    row.className=`stock-row${isTop?' top-pick':''}`;
+    row.style.animationDelay=(i*35)+'ms';
+    row.innerHTML=`
+      <div class="row-rank">${isTop?'🏆'+(i+1):String(i+1).padStart(2,'0')}</div>
+      <div class="row-ticker">${s.symbol}</div>
+      <div class="row-name" title="${s.name}">${s.name}</div>
+      <div class="row-price">$${parseFloat(s.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div class="row-pct ${pctClass(s.changesPercentage)}">+${s.changesPercentage.toFixed(2)}%</div>
+      <div class="row-vol">${fmtVol(s.volume)}</div>
+      <div class="row-sector ${sectorClass(s.sector)}">${s.sector||'—'}</div>
+    `;
+    row.onclick=()=>openScoreModal(s);
+    list.appendChild(row);
+  });
+}
+
+function renderBlocked(stocks) {
+  const list=document.getElementById('blockedList');
+  list.innerHTML='';
+  if(stocks.length===0){list.innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:11px;font-family:\'IBM Plex Mono\',monospace;">No stocks were blocked.</div>';return;}
+  stocks.forEach((s,i)=>{
+    const row=document.createElement('div');
+    row.className='blocked-row';
+    row.style.animationDelay=(i*25)+'ms';
+    row.innerHTML=`<span class="bx">✗</span><span class="bt">${s.symbol}</span><span class="br">${s.blockReason}</span><span class="bs">BLOCKED</span>`;
+    list.appendChild(row);
+  });
+}
+
+function renderSectors(stocks) {
+  const c=document.getElementById('sectorBreakdown');
+  if(!stocks.length){c.innerHTML='<div style="color:var(--muted);font-size:12px;">No data</div>';return;}
+  const counts={};
+  stocks.forEach(s=>{counts[s.sector||'Unknown']=(counts[s.sector||'Unknown']||0)+1;});
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const maxC=sorted[0][1];
+  const colors=['var(--cyan)','var(--green)','var(--orange)','var(--yellow)','var(--pink)','var(--muted2)'];
+  c.innerHTML='';
+  sorted.forEach(([sec,count],i)=>{
+    const d=document.createElement('div');
+    d.className='sector-bar-row';
+    d.innerHTML=`<div class="sector-bar-label"><span>${sec}</span><span>${count} stocks · ${Math.round(count/stocks.length*100)}%</span></div><div class="sector-bar-bg"><div class="sector-bar-fill" style="background:${colors[i%colors.length]};" data-w="${(count/maxC)*100}"></div></div>`;
+    c.appendChild(d);
+  });
+  setTimeout(()=>{document.querySelectorAll('.sector-bar-fill').forEach(b=>b.style.width=b.dataset.w+'%');},100);
+}
+
+// ── SCORE MODAL ────────────────────────────────────────────
+function openScoreModal(stock) {
+  const scored = stockScores[stock.symbol];
+  document.getElementById('modalTitle').textContent=`${stock.symbol} — Score: ${stock.score||'N/A'}/100`;
+  document.getElementById('modalSubtitle').textContent=`${stock.name} · ${stock.sector||'—'} · ${fmtMktCap(stock.mktCap)}`;
+
+  if(!scored){
+    document.getElementById('modalBody').innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Score breakdown not available for this stock.</div>';
+    document.getElementById('scorePanel').classList.add('open');
+    return;
+  }
+
+  const bd=scored.breakdown;
+  const barColor=(score,max)=>score/max>=0.8?'var(--green)':score/max>=0.5?'var(--yellow)':'var(--orange)';
+
+  const metrics=[
+    {key:'momentum',label:'Momentum (% Gain)',detail:`${bd.momentum.pct.toFixed(2)}% gain today`},
+    {key:'volume',label:'Volume Strength',detail:`${fmtVol(bd.volume.vol)} shares traded`},
+    {key:'sector',label:'Sector Quality',detail:bd.sector.sec||'Unknown'},
+    {key:'marketCap',label:'Market Cap',detail:fmtMktCap(bd.marketCap.cap)},
+    {key:'price',label:'Price Quality',detail:`$${bd.price.price?.toFixed(2)||'—'}`}
+  ];
+
+  const rows=metrics.map(m=>{
+    const d=bd[m.key];
+    const pct=(d.score/d.max)*100;
+    return `<div class="score-metric">
+      <div class="score-metric-label">${m.label}<br><span style="font-size:10px;color:var(--muted);">${m.detail}</span></div>
+      <div class="score-metric-bar-bg"><div class="score-metric-bar" style="width:${pct}%;background:${barColor(d.score,d.max)};"></div></div>
+      <div class="score-metric-val" style="color:${barColor(d.score,d.max)};">${d.score}/${d.max}</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin:-4px 0 10px 148px;font-family:'IBM Plex Mono',monospace;">${d.note}</div>`;
+  }).join('');
+
+  // Signals
+  const signals=[];
+  if(bd.momentum.pct>=3&&bd.momentum.pct<=10) signals.push({t:'Ideal gain range',c:'bull'});
+  if(bd.volume.vol>=5e6) signals.push({t:'High volume',c:'bull'});
+  if(stock.sector?.toLowerCase().includes('tech')) signals.push({t:'Tech sector',c:'bull'});
+  if(stock.mktCap>=10e9) signals.push({t:'Large cap',c:'bull'});
+  if(bd.momentum.pct>10) signals.push({t:'High gap — may reverse',c:'warn'});
+  if(stock.mktCap<500e6&&stock.mktCap>0) signals.push({t:'Small cap risk',c:'warn'});
+  if(bd.volume.vol<2e6) signals.push({t:'Low volume',c:'warn'});
+  if(!stock.sector||stock.sector==='Unknown') signals.push({t:'Sector unknown',c:'neu'});
+
+  const sigHtml=signals.map(s=>`<span class="signal-tag sig-${s.c}">${s.t}</span>`).join('');
+
+  document.getElementById('modalBody').innerHTML=`
+    <div class="score-section">
+      <div class="score-section-title">Score Breakdown</div>
+      ${rows}
+      <div class="score-total">
+        <span class="score-total-label">Composite Score</span>
+        <span class="score-total-val">${stock.score}/100</span>
+      </div>
+    </div>
+    <div class="score-section" style="margin-top:16px;">
+      <div class="score-section-title">Signals Detected</div>
+      <div style="padding:4px 0;">${sigHtml||'<span style="color:var(--muted);font-size:12px;">No signals detected</span>'}</div>
+    </div>
+    <div class="score-section" style="margin-top:16px;">
+      <div class="score-section-title">Data Sources Used</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted2);line-height:2;">
+        FMP /stock_market/gainers → price, changesPercentage, volume<br>
+        FMP /profile/${stock.symbol} → sector, industry, mktCap, companyName<br>
+        Scoring engine → composite rank vs other passed stocks
+      </div>
+    </div>
+  `;
+  document.getElementById('scorePanel').classList.add('open');
+}
+
+function closeModal(e){if(e.target.id==='scorePanel')document.getElementById('scorePanel').classList.remove('open');}
+
+// Auto-start
+loadData();
+</script>
+</body>
+</html>
