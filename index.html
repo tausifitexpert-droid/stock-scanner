@@ -766,7 +766,7 @@ body::before{
       <div class="panel-card">
         <div class="panel-title">🔗 API Resources Used This Run</div>
         <div class="api-row">
-          <div class="api-name">FMP /stable/biggest-gainers</div>
+          <div class="api-name">FMP /stable/most-active (primary source)</div>
           <div class="api-calls" id="callGainers">1 call</div>
           <div class="api-status api-pend" id="statusGainers">PENDING</div>
         </div>
@@ -857,8 +857,8 @@ body::before{
         </div>
 
         <div style="margin-top:12px;padding:9px 12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;gap:10px;">
-          <span style="font-size:14px;">⚠️</span>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--yellow);line-height:1.6;">TV uses 90-day avg volume; FMP returns real-time volume. Use <strong>LOOSE</strong> preset if getting 0 results.</span>
+          <span style="font-size:14px;">💡</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted2);line-height:1.6;">Filters run before API calls. Vol Max = 0 disables that filter. Use <span style="color:var(--green);">🐛 DEBUG</span> to see all raw data.</span>
         </div>
       </div>
 
@@ -1186,7 +1186,7 @@ function diagnoseError(status, message, context) {
     what = 'HTTP 403 Forbidden — Server refused your request';
     why = 'Your API key exists but the endpoint returned 403. This was caused by using the old legacy URL (/stock_market/gainers). The app now uses the correct URL (/api/v3/gainers). If you still see 403, your daily 250-call limit may be exhausted.';
     fixes = [
-      'Paste this URL in a new browser tab to test: https://financialmodelingprep.com/stable/biggest-gainers?apikey=' + API_KEY,
+      'Paste this URL in a new browser tab to test: https://financialmodelingprep.com/stable/most-active?apikey=' + API_KEY,
       'If it shows stock data → your key works but there is a CORS issue — host the file on GitHub Pages',
       'If it shows {"Error Message":"Legacy Endpoint..."} → your account was created after Aug 31 2025 and v3 is blocked (this app now uses /stable/ which should fix it)',
       'If it shows {"Error Message":"Limit Reach..."} → your daily 250-call limit is exhausted, resets at midnight UTC (8PM EST)',
@@ -1372,90 +1372,68 @@ async function loadData() {
   setProgress(5);
 
   addLog('🚀','Scan started','info','NEW RUN','badge-api');
-  addLog('📋',`Active filters — see Pre-Filter Settings panel for thresholds | Sector exclusions: Healthcare, Biotech, Pharma | Missing sector = not blocked`,'');
-  addLog('🧮','Scoring weights: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt max','data');
-  addLog('🌐','Preparing API call #1 → FMP /stable/biggest-gainers (new stable endpoint)','info','API CALL','badge-api');
+  addLog('📋',`Active filters — see Pre-Filter Settings panel | Excludes: Health + Finance sectors`,'');
+  addLog('🧮','Scoring: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt','data');
 
   try {
-    // ── STEP 1: Gainers ────────────────────────────────────
+    // ── STEP 1: most-active = primary source (has volume + marketCap + % change) ──
+    // biggest-gainers is NOT used — it returns penny stocks with no volume data
     setProgress(10);
-    const gainersUrl = `https://financialmodelingprep.com/stable/biggest-gainers?apikey=${API_KEY}`;
-    addLog('📡',`GET ${gainersUrl.replace(API_KEY,'[KEY]')}`, 'info');
-    addLog('ℹ️','Using new /stable/ endpoint — v3 endpoints are legacy and blocked for accounts created after Aug 31 2025','info');
+    addLog('🌐','Fetching /stable/most-active — primary source (volume + marketCap + % change)','info','API CALL','badge-api');
 
-    let gainersRes;
+    let activesRes;
     try {
-      gainersRes = await fetch(gainersUrl);
+      activesRes = await fetch(`https://financialmodelingprep.com/stable/most-active?apikey=${API_KEY}`);
     } catch(netErr) {
-      diagnoseError(0, netErr.message, 'Fetching /api/v3/gainers — likely CORS (open via python3 server, not file://)');
-      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH';
-      addLog('💡','Fix: Terminal → cd ~/Downloads && python3 -m http.server 8080 → Chrome → http://localhost:8080/index.html','warn');
-      return;
+      diagnoseError(0, netErr.message, 'Network error — make sure you opened this via http://localhost:8080, not file://');
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
     apiCallCount++;
     document.getElementById('callTotal').textContent = apiCallCount;
-    addLog('📬',`Response received — HTTP ${gainersRes.status} ${gainersRes.statusText}`, gainersRes.ok?'ok':'err');
+    addLog('📬',`HTTP ${activesRes.status} ${activesRes.statusText}`, activesRes.ok?'ok':'err');
 
-    if(!gainersRes.ok){
-      const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='ERROR '+gainersRes.status;
-      diagnoseError(gainersRes.status, gainersRes.statusText, 'Fetching /stable/biggest-gainers');
+    if(!activesRes.ok){
+      const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='ERROR '+activesRes.status;
+      diagnoseError(activesRes.status, activesRes.statusText, 'Fetching /stable/most-active');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
-    let gainersData = await gainersRes.json();
+    let activesRaw = await activesRes.json();
 
-    // Log raw response shape for debugging
-    addLog('🔬',`Raw response type: ${Array.isArray(gainersData)?'Array['+gainersData.length+']':typeof gainersData} | Keys: ${!Array.isArray(gainersData)?Object.keys(gainersData||{}).slice(0,5).join(', '):'n/a'}`,'data');
-
-    // Handle all known FMP error response shapes
-    const errMsg = gainersData?.['Error Message'] || gainersData?.message || gainersData?.error || gainersData?.['error_message'];
+    // Handle FMP error shapes
+    const errMsg = activesRaw?.['Error Message'] || activesRaw?.message || activesRaw?.error;
     if(errMsg){
       const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='API ERR';
-      diagnoseError(gainersData?.status||403, errMsg, 'FMP returned error object — check your API key and plan at financialmodelingprep.com/developer/docs/pricing');
+      diagnoseError(activesRaw?.status||403, errMsg, 'FMP error — check your API key');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
-    // Handle case where API returns a single object instead of array
-    if(gainersData && !Array.isArray(gainersData) && gainersData.symbol){
-      gainersData = [gainersData];
-      addLog('⚠️','API returned single object — wrapped in array','warn');
+    if(!Array.isArray(activesRaw) || activesRaw.length === 0){
+      diagnoseError(200,'No data returned from /stable/most-active','US market may be closed. Hours: Mon–Fri 9:30AM–4:00PM EST.');
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
-    // Normalize field names — /stable/ API uses slightly different field names
-    if(Array.isArray(gainersData)){
-      gainersData = gainersData.map(s=>({
-        symbol: s.symbol,
-        name: s.name||s.companyName||s.symbol,
-        price: parseFloat(s.price||s.lastPrice||0),
-        changesPercentage: parseFloat(s.changesPercentage||s.changePercentage||s.percentChange||0),
-        volume: parseInt(s.volume||0),
-        change: parseFloat(s.change||0)
-      })).filter(s=>s.symbol);
-    }
+    // Normalize — log every stock so we can see exactly what FMP returns
+    let gainersData = activesRaw.map(s => ({
+      symbol:            s.symbol,
+      name:              s.name || s.companyName || s.symbol,
+      price:             parseFloat(s.price || s.lastPrice || 0),
+      changesPercentage: parseFloat(s.changesPercentage || s.changePercentage || s.percentChange || 0),
+      volume:            parseInt(s.volume || 0),
+      marketCap:         parseFloat(s.marketCap || s.mktCap || 0),
+      change:            parseFloat(s.change || 0),
+    })).filter(s => s.symbol);
 
-    // Fallback to /stable/most-active if gainers empty (market closed / pre-market)
-    if(!Array.isArray(gainersData)||gainersData.length===0){
-      addLog('⚠️','Gainers empty — trying /stable/most-active as fallback...','warn');
-      const activesRes=await fetch(`https://financialmodelingprep.com/stable/most-active?apikey=${API_KEY}`);
-      apiCallCount++;
-      if(activesRes.ok){
-        let a=await activesRes.json();
-        if(Array.isArray(a)&&a.length>0){
-          gainersData=a.map(s=>({symbol:s.symbol,name:s.name||s.symbol,price:parseFloat(s.price||0),changesPercentage:parseFloat(s.changesPercentage||s.changePercentage||0),volume:parseInt(s.volume||0),change:parseFloat(s.change||0)}));
-          addLog('✅',`Fallback /stable/most-active returned ${gainersData.length} stocks`,'ok');
-        }
-      }
-      if(!Array.isArray(gainersData)||gainersData.length===0){
-        diagnoseError(200,'No market data available','US market is likely closed. Hours: Mon–Fri 9:30AM–4:00PM EST.');
-        setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
-      }
-    }
+    addLog('🔬',`Raw fields sample [${gainersData[0]?.symbol}]: price=$${gainersData[0]?.price} | pct=${gainersData[0]?.changesPercentage}% | vol=${fmtVol(gainersData[0]?.volume)} | mktCap=${fmtMktCap(gainersData[0]?.marketCap)}`,'data');
+    addLog('✅',`most-active returned ${gainersData.length} stocks`,'ok','SOURCE','badge-api');
+    gainersData.forEach(s => {
+      addLog('📌',`${s.symbol} | $${s.price.toFixed(2)} | ${s.changesPercentage.toFixed(2)}% | Vol:${fmtVol(s.volume)} | MCap:${fmtMktCap(s.marketCap)}`,'data');
+    });
 
     const el1=document.getElementById('statusGainers'); el1.className='api-status api-ok'; el1.textContent='OK ✓';
-    addLog('✅',`Gainers endpoint success — ${gainersData.length} stocks returned`,'ok','GAINERS','badge-api');
     document.getElementById('statFetched').textContent = gainersData.length;
-    document.getElementById('statFetchedSub').textContent = `${gainersData.length} total gainers today`;
+    document.getElementById('statFetchedSub').textContent = `${gainersData.length} stocks in pool`;
 
     // ── STEP 2: PRE-FILTER (zero API calls) ───────────────
     // Log EVERY raw stock so we can see exactly what FMP is returning
