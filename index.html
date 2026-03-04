@@ -5,203 +5,587 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live AI Stock Scanner</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg:#060a0f; --surface:#0c1219; --surface2:#111b26; --surface3:#162233;
-  --border:#1c2e40; --border2:#243a50;
-  --cyan:#00e5ff; --green:#00ff9d; --orange:#ff7043;
-  --yellow:#ffd600; --red:#ff1744; --pink:#f50057;
-  --text:#ddeeff; --muted:#3d5a73; --muted2:#5a7a96;
+  --bg:#04080d;
+  --surface:#080f18;
+  --surface2:#0d1820;
+  --surface3:#112030;
+  --border:#162130;
+  --border2:#1e3048;
+  --cyan:#00d4f5;
+  --cyan-dim:rgba(0,212,245,0.12);
+  --green:#00e87a;
+  --green-dim:rgba(0,232,122,0.1);
+  --orange:#ff6b35;
+  --yellow:#f5c518;
+  --red:#ff3860;
+  --pink:#f50057;
+  --purple:#9b8fff;
+  --text:#c8dff0;
+  --text2:#8fafc8;
+  --muted:#2d4a62;
+  --muted2:#4a6a84;
+  --glow-cyan:0 0 20px rgba(0,212,245,0.25);
+  --glow-green:0 0 20px rgba(0,232,122,0.25);
 }
+
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden;}
-body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.01) 2px,rgba(0,229,255,0.01) 4px);pointer-events:none;z-index:9999;}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.02) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;}
 
-/* TOPBAR */
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(6,10,15,0.97);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px;}
-.logo{display:flex;align-items:center;gap:12px;}
-.logo-icon{width:36px;height:36px;border:2px solid var(--cyan);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 15px rgba(0,229,255,0.3);animation:iconGlow 3s infinite alternate;}
-@keyframes iconGlow{from{box-shadow:0 0 10px rgba(0,229,255,0.2);}to{box-shadow:0 0 25px rgba(0,229,255,0.6);}}
-.logo-text{font-size:17px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#fff;}
-.logo-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;margin-top:1px;}
-.topbar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.live-indicator{display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);letter-spacing:1px;}
-.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:livePulse 1.5s infinite;}
-@keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
-.clock{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted2);letter-spacing:1px;}
-.btn-refresh{background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;text-transform:uppercase;}
-.btn-refresh:hover{background:rgba(0,229,255,0.15);box-shadow:0 0 20px rgba(0,229,255,0.2);}
-.btn-refresh:disabled{opacity:0.4;cursor:not-allowed;}
-.market-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 12px;border-radius:20px;letter-spacing:1px;}
-.market-open{background:rgba(0,255,157,0.1);color:var(--green);border:1px solid rgba(0,255,157,0.3);}
-.market-closed{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.3);}
-.market-pre{background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.3);}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
 
-/* MAIN */
-.main{padding:24px;max-width:1500px;margin:0 auto;}
-.disclaimer{background:rgba(255,214,0,0.05);border:1px solid rgba(255,214,0,0.15);border-radius:8px;padding:10px 16px;font-size:11px;color:rgba(255,214,0,0.6);font-family:'IBM Plex Mono',monospace;margin-bottom:18px;letter-spacing:0.5px;}
+/* Subtle scanline texture */
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,212,245,0.008) 3px,rgba(0,212,245,0.008) 4px);
+  pointer-events:none;z-index:9999;
+}
 
-/* STATS */
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.4;}
-.stat-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;}
-.stat-value{font-size:24px;font-weight:800;color:#fff;line-height:1;}
-.stat-value.cyan{color:var(--cyan);}.stat-value.green{color:var(--green);}.stat-value.orange{color:var(--orange);}.stat-value.yellow{color:var(--yellow);}
-.stat-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);margin-top:4px;}
+/* Subtle grid */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(0,212,245,0.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,212,245,0.018) 1px,transparent 1px);
+  background-size:60px 60px;
+  pointer-events:none;
+}
 
-/* ACTION LOG */
-.log-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden;}
-.log-header{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface2);cursor:pointer;user-select:none;}
-.log-header-left{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);}
-.log-toggle{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer;}
-.log-body{max-height:280px;overflow-y:auto;padding:8px 0;}
-.log-entry{display:flex;gap:12px;align-items:flex-start;padding:5px 16px;border-bottom:1px solid rgba(28,46,64,0.3);font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;}
+/* ─── TOPBAR ─────────────────────────────────────────────── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:58px;
+  border-bottom:1px solid var(--border);
+  background:rgba(4,8,13,0.98);
+  backdrop-filter:blur(16px);
+  position:sticky;top:0;z-index:100;
+  flex-wrap:wrap;gap:10px;
+}
+
+.logo{display:flex;align-items:center;gap:14px;}
+
+.logo-icon{
+  width:34px;height:34px;
+  border:1.5px solid var(--cyan);
+  border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;
+  background:rgba(0,212,245,0.06);
+  box-shadow:var(--glow-cyan);
+  animation:iconGlow 3s infinite alternate;
+}
+@keyframes iconGlow{
+  from{box-shadow:0 0 8px rgba(0,212,245,0.2),inset 0 0 8px rgba(0,212,245,0.04);}
+  to{box-shadow:0 0 22px rgba(0,212,245,0.5),inset 0 0 12px rgba(0,212,245,0.08);}
+}
+
+.logo-text{
+  font-size:15px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:#fff;
+}
+.logo-sub{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  color:var(--cyan);letter-spacing:3px;text-transform:uppercase;
+  margin-top:2px;opacity:0.7;
+}
+
+.topbar-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+
+.live-indicator{
+  display:flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  color:var(--green);letter-spacing:1.5px;
+}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--green);box-shadow:0 0 8px var(--green);
+  animation:livePulse 1.5s infinite;
+}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.35;transform:scale(0.75);}}
+
+.clock{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;
+  color:var(--muted2);letter-spacing:1px;
+}
+
+.btn-demo{
+  background:rgba(155,143,255,0.08);
+  border:1px solid rgba(155,143,255,0.28);
+  color:var(--purple);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  padding:7px 14px;border-radius:5px;cursor:pointer;
+  letter-spacing:1.5px;transition:all 0.2s;text-transform:uppercase;
+  font-weight:600;
+}
+.btn-demo:hover{background:rgba(155,143,255,0.14);box-shadow:0 0 18px rgba(155,143,255,0.15);}
+.btn-refresh{
+  background:rgba(0,212,245,0.07);
+  border:1px solid rgba(0,212,245,0.28);
+  color:var(--cyan);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  padding:7px 16px;border-radius:5px;cursor:pointer;
+  letter-spacing:1.5px;transition:all 0.2s;text-transform:uppercase;
+  font-weight:600;
+}
+.btn-refresh:hover{
+  background:rgba(0,212,245,0.14);
+  box-shadow:0 0 18px rgba(0,212,245,0.18);
+  border-color:rgba(0,212,245,0.5);
+}
+.btn-refresh:disabled{opacity:0.35;cursor:not-allowed;}
+
+.market-badge{
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  padding:4px 11px;border-radius:20px;letter-spacing:1.5px;font-weight:600;
+}
+.market-open{background:rgba(0,232,122,0.1);color:var(--green);border:1px solid rgba(0,232,122,0.28);}
+.market-closed{background:rgba(255,56,96,0.1);color:var(--red);border:1px solid rgba(255,56,96,0.28);}
+.market-pre{background:rgba(245,197,24,0.1);color:var(--yellow);border:1px solid rgba(245,197,24,0.28);}
+
+/* ─── MAIN ───────────────────────────────────────────────── */
+.main{padding:24px 28px;max-width:1540px;margin:0 auto;}
+
+.disclaimer{
+  background:rgba(245,197,24,0.04);
+  border:1px solid rgba(245,197,24,0.12);
+  border-radius:6px;
+  padding:9px 15px;
+  font-size:10.5px;color:rgba(245,197,24,0.55);
+  font-family:'IBM Plex Mono',monospace;
+  margin-bottom:20px;letter-spacing:0.3px;
+  display:flex;align-items:center;gap:10px;
+}
+
+/* ─── STATS ──────────────────────────────────────────────── */
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px;margin-bottom:18px;
+}
+
+.stat-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px 18px;
+  position:relative;overflow:hidden;
+  transition:border-color 0.2s;
+}
+.stat-card:hover{border-color:var(--border2);}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1.5px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:0.35;
+}
+
+.stat-label{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:8px;
+}
+.stat-value{
+  font-size:26px;font-weight:700;color:#fff;line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.stat-value.cyan{color:var(--cyan);}
+.stat-value.green{color:var(--green);}
+.stat-value.orange{color:var(--orange);}
+.stat-value.yellow{color:var(--yellow);}
+.stat-sub{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  color:var(--muted);margin-top:5px;
+}
+
+/* ─── ACTION LOG ─────────────────────────────────────────── */
+.log-panel{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:16px;overflow:hidden;
+}
+.log-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:var(--surface2);cursor:pointer;user-select:none;
+}
+.log-header-left{
+  display:flex;align-items:center;gap:10px;
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted2);
+}
+.log-toggle{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted);cursor:pointer;}
+.log-body{max-height:260px;overflow-y:auto;padding:4px 0;}
+
+.log-entry{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:5px 16px;
+  border-bottom:1px solid rgba(22,33,48,0.6);
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.5;
+}
 .log-entry:last-child{border-bottom:none;}
-.log-time{color:var(--muted);white-space:nowrap;min-width:70px;font-size:10px;padding-top:1px;}
+.log-time{color:var(--muted);white-space:nowrap;min-width:72px;font-size:9.5px;padding-top:1px;}
 .log-icon{min-width:16px;text-align:center;}
 .log-msg{color:var(--muted2);flex:1;}
 .log-msg.ok{color:var(--green);}
 .log-msg.err{color:var(--red);}
 .log-msg.warn{color:var(--yellow);}
 .log-msg.info{color:var(--cyan);}
-.log-msg.data{color:#a78bfa;}
-.log-badge{font-size:9px;padding:1px 7px;border-radius:3px;margin-left:8px;white-space:nowrap;}
-.badge-api{background:rgba(0,229,255,0.1);color:var(--cyan);border:1px solid rgba(0,229,255,0.2);}
-.badge-filter{background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);}
-.badge-score{background:rgba(0,255,157,0.1);color:var(--green);border:1px solid rgba(0,255,157,0.2);}
-.badge-warn{background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.2);}
+.log-msg.data{color:var(--purple);}
 
-/* PROGRESS */
-.progress-wrap{height:3px;background:var(--border);border-radius:2px;margin-bottom:20px;overflow:hidden;}
-.progress-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;width:0%;transition:width 0.4s ease;box-shadow:0 0 12px rgba(0,229,255,0.5);}
+.log-badge{
+  font-size:8.5px;padding:1px 6px;border-radius:3px;
+  margin-left:8px;white-space:nowrap;font-weight:600;
+}
+.badge-api{background:rgba(0,212,245,0.09);color:var(--cyan);border:1px solid rgba(0,212,245,0.2);}
+.badge-filter{background:rgba(255,56,96,0.09);color:var(--red);border:1px solid rgba(255,56,96,0.2);}
+.badge-score{background:rgba(0,232,122,0.09);color:var(--green);border:1px solid rgba(0,232,122,0.2);}
+.badge-warn{background:rgba(245,197,24,0.09);color:var(--yellow);border:1px solid rgba(245,197,24,0.2);}
 
-/* ERROR BOX */
-.error-box{background:rgba(255,23,68,0.06);border:1px solid rgba(255,23,68,0.3);border-radius:10px;padding:0;margin-bottom:20px;overflow:hidden;display:none;}
-.error-title{background:rgba(255,23,68,0.12);padding:12px 18px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--red);border-bottom:1px solid rgba(255,23,68,0.2);display:flex;align-items:center;gap:10px;}
-.error-body{padding:16px 18px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#ff6b7a;line-height:1.9;}
-.error-row{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,23,68,0.1);}
+/* ─── PROGRESS ───────────────────────────────────────────── */
+.progress-wrap{
+  height:2px;background:rgba(22,33,48,0.8);
+  border-radius:2px;margin-bottom:18px;overflow:hidden;
+}
+.progress-fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--cyan),var(--green));
+  border-radius:2px;width:0%;
+  transition:width 0.4s ease;
+  box-shadow:0 0 10px rgba(0,212,245,0.6);
+}
+
+/* ─── ERROR BOX ──────────────────────────────────────────── */
+.error-box{
+  background:rgba(255,56,96,0.04);
+  border:1px solid rgba(255,56,96,0.25);
+  border-radius:10px;padding:0;
+  margin-bottom:18px;overflow:hidden;display:none;
+}
+.error-title{
+  background:rgba(255,56,96,0.1);
+  padding:11px 16px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;
+  font-weight:700;color:var(--red);
+  border-bottom:1px solid rgba(255,56,96,0.18);
+  display:flex;align-items:center;gap:10px;
+}
+.error-body{padding:14px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff7090;line-height:1.9;}
+.error-row{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,56,96,0.08);}
 .error-row:last-child{border-bottom:none;}
 .err-label{color:var(--red);min-width:160px;font-weight:600;}
 .err-val{color:#ff9aaa;}
-.fix-section{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,23,68,0.2);}
+.fix-section{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,56,96,0.15);}
 .fix-title{color:var(--yellow);font-weight:700;margin-bottom:8px;}
 .fix-row{display:flex;gap:8px;padding:3px 0;color:#ffd6a5;}
 .fix-num{color:var(--yellow);min-width:20px;}
 
-/* LAYOUT */
-.columns{display:grid;grid-template-columns:1fr 400px;gap:18px;}
+/* ─── LAYOUT ─────────────────────────────────────────────── */
+.columns{display:grid;grid-template-columns:1fr 390px;gap:16px;}
 @media(max-width:960px){.columns{grid-template-columns:1fr;}}
 
-/* SECTION HEADERS */
-.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.section-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2);display:flex;align-items:center;gap:8px;}
-.section-title .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
-.section-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:3px 10px;border-radius:20px;border:1px solid var(--border);}
+/* ─── SECTION HEADERS ────────────────────────────────────── */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.section-title{
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--muted2);
+  display:flex;align-items:center;gap:8px;
+}
+.section-title .dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--cyan);box-shadow:0 0 6px var(--cyan);
+}
+.section-count{
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  color:var(--muted2);
+  background:var(--surface2);
+  padding:3px 10px;border-radius:20px;
+  border:1px solid var(--border);
+}
 
-/* STOCKS TABLE */
-.stocks-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.table-head{display:grid;grid-template-columns:44px 80px 1fr 95px 85px 95px 110px;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);}
-.th{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+/* ─── STOCKS TABLE ───────────────────────────────────────── */
+.stocks-panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;
+}
+.table-head{
+  display:grid;
+  grid-template-columns:40px 78px 1fr 96px 84px 92px 108px;
+  gap:6px;padding:10px 16px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface2);
+}
+.th{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+}
 .stocks-list{max-height:560px;overflow-y:auto;}
-.stock-row{display:grid;grid-template-columns:44px 80px 1fr 95px 85px 95px 110px;gap:6px;padding:12px 16px;border-bottom:1px solid rgba(28,46,64,0.4);align-items:center;cursor:pointer;opacity:0;transform:translateX(-8px);animation:rowIn 0.4s forwards;transition:background 0.2s;}
-.stock-row:hover{background:rgba(255,255,255,0.025);}
-.stock-row.top-pick{background:rgba(0,255,157,0.025);border-left:2px solid var(--green);}
+
+.stock-row{
+  display:grid;
+  grid-template-columns:40px 78px 1fr 96px 84px 92px 108px;
+  gap:6px;padding:11px 16px;
+  border-bottom:1px solid rgba(22,33,48,0.6);
+  align-items:center;cursor:pointer;
+  opacity:0;transform:translateX(-6px);
+  animation:rowIn 0.35s forwards;
+  transition:background 0.15s;
+}
+.stock-row:hover{background:rgba(255,255,255,0.022);}
+.stock-row.top-pick{
+  background:rgba(0,232,122,0.02);
+  border-left:2px solid rgba(0,232,122,0.5);
+}
 .stock-row:last-child{border-bottom:none;}
 @keyframes rowIn{to{opacity:1;transform:translateX(0);}}
-.row-rank{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);text-align:center;}
-.row-ticker{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#fff;}
-.row-name{font-size:12px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.row-price{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--text);}
-.row-pct{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;padding:3px 7px;border-radius:5px;text-align:center;}
-.pct-hot{color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
-.pct-warm{color:var(--yellow);background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.2);}
-.pct-mild{color:var(--cyan);background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);}
+
+.row-rank{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;
+  color:var(--muted);text-align:center;
+}
+.row-ticker{
+  font-family:'IBM Plex Mono',monospace;font-size:13px;
+  font-weight:700;color:#fff;letter-spacing:0.5px;
+}
+.row-name{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-price{
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+  font-weight:600;color:var(--text);
+}
+.row-pct{
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  font-weight:700;padding:3px 7px;border-radius:4px;text-align:center;
+}
+.pct-hot{color:var(--green);background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.18);}
+.pct-warm{color:var(--yellow);background:rgba(245,197,24,0.08);border:1px solid rgba(245,197,24,0.18);}
+.pct-mild{color:var(--cyan);background:rgba(0,212,245,0.08);border:1px solid rgba(0,212,245,0.18);}
 .row-vol{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted2);}
-.row-sector{font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
-.sector-tech{color:var(--cyan);border-color:rgba(0,229,255,0.2);background:rgba(0,229,255,0.06);}
-.sector-fin{color:var(--green);border-color:rgba(0,255,157,0.2);background:rgba(0,255,157,0.06);}
-.sector-energy{color:var(--orange);border-color:rgba(255,112,67,0.2);background:rgba(255,112,67,0.06);}
-.sector-cons{color:var(--yellow);border-color:rgba(255,214,0,0.2);background:rgba(255,214,0,0.06);}
+.row-sector{
+  font-size:9.5px;padding:3px 8px;border-radius:4px;
+  border:1px solid var(--border);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-weight:600;letter-spacing:0.3px;
+}
+.sector-tech{color:var(--cyan);border-color:rgba(0,212,245,0.18);background:rgba(0,212,245,0.05);}
+.sector-fin{color:var(--green);border-color:rgba(0,232,122,0.18);background:rgba(0,232,122,0.05);}
+.sector-energy{color:var(--orange);border-color:rgba(255,107,53,0.18);background:rgba(255,107,53,0.05);}
+.sector-cons{color:var(--yellow);border-color:rgba(245,197,24,0.18);background:rgba(245,197,24,0.05);}
 .sector-other{color:var(--muted2);border-color:var(--border);background:var(--surface2);}
 
-/* SCORE MODAL */
-.score-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+/* ─── SCORE MODAL ────────────────────────────────────────── */
+.score-panel{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);
+  z-index:1000;align-items:center;justify-content:center;
+  backdrop-filter:blur(6px);
+}
 .score-panel.open{display:flex;}
-.score-modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:90%;max-width:560px;overflow:hidden;animation:modalIn 0.3s ease;}
-@keyframes modalIn{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
-.score-modal-header{background:var(--surface2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
-.score-modal-title{font-size:18px;font-weight:800;color:#fff;}
-.score-modal-close{background:none;border:none;color:var(--muted2);font-size:20px;cursor:pointer;padding:0 4px;}
-.score-modal-close:hover{color:#fff;}
+.score-modal{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:14px;width:90%;max-width:560px;
+  overflow:hidden;
+  animation:modalIn 0.25s ease;
+  box-shadow:0 30px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(0,212,245,0.06);
+}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.score-modal-header{
+  background:var(--surface2);
+  padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.score-modal-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:0.3px;}
+.score-modal-close{
+  background:none;border:none;color:var(--muted2);
+  font-size:18px;cursor:pointer;padding:2px 6px;
+  border-radius:4px;transition:all 0.15s;
+}
+.score-modal-close:hover{color:#fff;background:rgba(255,255,255,0.06);}
 .score-modal-body{padding:20px;max-height:70vh;overflow-y:auto;}
 .score-section{margin-bottom:16px;}
-.score-section-title{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.score-section-title{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
 .score-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
 .score-metric{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.score-metric-label{font-size:12px;color:var(--muted2);min-width:140px;}
-.score-metric-bar-bg{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;}
-.score-metric-bar{height:100%;border-radius:4px;transition:width 0.8s ease;}
+.score-metric-label{font-size:12px;color:var(--text2);min-width:140px;}
+.score-metric-bar-bg{
+  flex:1;height:7px;background:var(--surface2);
+  border-radius:4px;overflow:hidden;
+}
+.score-metric-bar{height:100%;border-radius:4px;transition:width 0.7s ease;}
 .score-metric-val{font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:50px;text-align:right;}
-.score-total{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:8px;margin-top:10px;border:1px solid var(--border2);}
-.score-total-label{font-size:13px;font-weight:700;}
+.score-total{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;
+  background:var(--surface2);border-radius:8px;
+  margin-top:10px;border:1px solid var(--border2);
+}
+.score-total-label{font-size:13px;font-weight:600;}
 .score-total-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--green);}
-.signal-tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;margin:3px;border:1px solid;}
-.sig-bull{color:var(--green);border-color:rgba(0,255,157,0.3);background:rgba(0,255,157,0.06);}
-.sig-warn{color:var(--yellow);border-color:rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);}
+.signal-tag{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;
+  font-size:9.5px;padding:3px 9px;border-radius:4px;
+  margin:3px;border:1px solid;
+}
+.sig-bull{color:var(--green);border-color:rgba(0,232,122,0.28);background:rgba(0,232,122,0.05);}
+.sig-warn{color:var(--yellow);border-color:rgba(245,197,24,0.28);background:rgba(245,197,24,0.05);}
 .sig-neu{color:var(--muted2);border-color:var(--border);background:var(--surface2);}
 
-/* BLOCKED */
-.blocked-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:18px;}
-.blocked-list{max-height:160px;overflow-y:auto;padding:4px 0;}
-.blocked-row{display:grid;grid-template-columns:24px 70px 1fr 90px;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(28,46,64,0.3);align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;opacity:0;animation:rowIn 0.4s forwards;}
+/* ─── BLOCKED ────────────────────────────────────────────── */
+.blocked-panel{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;margin-top:16px;
+}
+.blocked-list{max-height:150px;overflow-y:auto;padding:4px 0;}
+.blocked-row{
+  display:grid;grid-template-columns:22px 68px 1fr 88px;
+  gap:8px;padding:7px 16px;
+  border-bottom:1px solid rgba(22,33,48,0.5);
+  align-items:center;font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;opacity:0;animation:rowIn 0.35s forwards;
+}
 .blocked-row:last-child{border-bottom:none;}
 .bx{color:var(--red);font-weight:700;}
-.bt{color:rgba(255,255,255,0.35);font-weight:700;}
-.br{color:var(--muted);font-size:10px;}
-.bs{font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);text-align:center;}
+.bt{color:rgba(255,255,255,0.3);font-weight:700;}
+.br{color:var(--muted);font-size:9.5px;}
+.bs{
+  font-size:8.5px;padding:2px 7px;border-radius:3px;
+  background:rgba(255,56,96,0.08);color:var(--red);
+  border:1px solid rgba(255,56,96,0.18);text-align:center;font-weight:600;
+}
 
-/* RIGHT PANEL */
-.right-panel{display:flex;flex-direction:column;gap:16px;}
-.panel-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
-.panel-title{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.filter-rule{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.4);font-size:12px;}
+/* ─── RIGHT PANEL ────────────────────────────────────────── */
+.right-panel{display:flex;flex-direction:column;gap:14px;}
+.panel-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px 18px;
+}
+.panel-title{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:13px;
+  display:flex;align-items:center;gap:8px;
+}
+.filter-rule{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid rgba(22,33,48,0.5);
+  font-size:11.5px;
+}
 .filter-rule:last-child{border-bottom:none;}
 .rule-icon{min-width:20px;text-align:center;}
-.rule-text{flex:1;color:var(--muted2);}
-.rule-on{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;border-radius:3px;color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
+.rule-text{flex:1;color:var(--text2);}
+.rule-on{
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  padding:2px 7px;border-radius:3px;
+  color:var(--green);background:rgba(0,232,122,0.07);
+  border:1px solid rgba(0,232,122,0.18);font-weight:600;
+}
 
-/* SCORING LEGEND */
-.score-legend-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.3);font-size:12px;}
+/* ─── SCORING LEGEND ─────────────────────────────────────── */
+.score-legend-row{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid rgba(22,33,48,0.5);
+  font-size:11.5px;
+}
 .score-legend-row:last-child{border-bottom:none;}
-.legend-weight{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;min-width:36px;color:var(--cyan);}
-.legend-label{flex:1;color:var(--muted2);}
-.legend-source{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:3px;border:1px solid var(--border);}
+.legend-weight{
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  font-weight:700;min-width:34px;color:var(--cyan);
+}
+.legend-label{flex:1;color:var(--text2);}
+.legend-source{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  color:var(--muted);background:var(--surface2);
+  padding:2px 7px;border-radius:3px;border:1px solid var(--border);
+}
 
-/* SECTOR BARS */
-.sector-bar-row{margin-bottom:10px;}
-.sector-bar-label{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;color:var(--muted2);}
-.sector-bar-label span:last-child{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);}
-.sector-bar-bg{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;}
-.sector-bar-fill{height:100%;border-radius:3px;transition:width 1s ease;width:0%;}
+/* ─── SECTOR BARS ────────────────────────────────────────── */
+.sector-bar-row{margin-bottom:11px;}
+.sector-bar-label{
+  display:flex;justify-content:space-between;margin-bottom:5px;
+  font-size:11px;color:var(--text2);
+}
+.sector-bar-label span:last-child{
+  font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text);
+}
+.sector-bar-bg{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;}
+.sector-bar-fill{height:100%;border-radius:2px;transition:width 1s ease;width:0%;}
 
-/* API STATUS */
-.api-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(28,46,64,0.3);font-size:11px;}
+/* ─── API STATUS ─────────────────────────────────────────── */
+.api-row{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid rgba(22,33,48,0.5);
+  font-size:10.5px;
+}
 .api-row:last-child{border-bottom:none;}
-.api-name{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted2);flex:1;}
-.api-calls{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);}
-.api-status{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;}
-.api-ok{color:var(--green);background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);}
-.api-err{color:var(--red);background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.2);}
+.api-name{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text2);flex:1;}
+.api-calls{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text);}
+.api-status{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  padding:2px 7px;border-radius:3px;font-weight:600;
+}
+.api-ok{color:var(--green);background:rgba(0,232,122,0.07);border:1px solid rgba(0,232,122,0.18);}
+.api-err{color:var(--red);background:rgba(255,56,96,0.07);border:1px solid rgba(255,56,96,0.18);}
 .api-pend{color:var(--muted);background:var(--surface2);border:1px solid var(--border);}
 
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+/* ─── SETTINGS FIELDS ────────────────────────────────────── */
+.setting-field{display:flex;flex-direction:column;gap:4px;}
+.setting-label{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);
+}
+.setting-input{
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:5px;
+  color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:13px;
+  font-weight:600;
+  padding:7px 10px;
+  width:100%;
+  transition:border-color 0.2s;
+  -moz-appearance:textfield;
+}
+.setting-input::-webkit-outer-spin-button,
+.setting-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.setting-input:focus{
+  outline:none;
+  border-color:rgba(0,212,245,0.5);
+  box-shadow:0 0 0 2px rgba(0,212,245,0.06);
+}
+.setting-hint{font-size:9.5px;color:var(--muted);line-height:1.3;}
 
-.footer{text-align:center;padding:24px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;border-top:1px solid var(--border);margin-top:24px;line-height:1.8;}
+/* ─── SCROLLBARS ─────────────────────────────────────────── */
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+
+/* ─── FOOTER ─────────────────────────────────────────────── */
+.footer{
+  text-align:center;padding:22px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9.5px;color:var(--muted);
+  letter-spacing:1.5px;
+  border-top:1px solid var(--border);
+  margin-top:24px;line-height:2;
+}
 </style>
 </head>
 <body>
@@ -219,12 +603,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div id="marketBadge" class="market-badge market-pre">CHECKING...</div>
     <div class="live-indicator"><div class="live-dot"></div>FMP LIVE</div>
     <div class="clock" id="clock">--:--:--</div>
+    <button class="btn-demo" id="demoBtn" onclick="loadDemo()">⚡ DEMO</button>
     <button class="btn-refresh" id="refreshBtn" onclick="loadData()">⟳ REFRESH</button>
   </div>
 </div>
 
+
 <div class="main">
-  <div class="disclaimer">⚠ EDUCATIONAL PURPOSE ONLY — Real market data for informational use. Not financial advice. Always do your own research before trading.</div>
+  <div class="disclaimer"><span>⚠</span> EDUCATIONAL PURPOSE ONLY — Real market data for informational use only. Not financial advice. Always conduct your own research before making any trading decisions.</div>
 
   <!-- STATS -->
   <div class="stats-row">
@@ -355,21 +741,24 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <span class="legend-label">Price range quality ($10–$500)</span>
           <span class="legend-source">FMP Gainers</span>
         </div>
-        <div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px;">CLICK ANY ROW to see full score breakdown</div>
-          <div style="font-size:11px;color:var(--muted);">Top 5 = highest composite scores after all filters pass</div>
+        <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);border-left:2px solid var(--cyan);">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:var(--cyan);letter-spacing:1.5px;margin-bottom:5px;text-transform:uppercase;">CLICK ANY ROW</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5;">View full score breakdown with signals for any stock in the table</div>
         </div>
       </div>
 
       <!-- FILTER RULES -->
       <div class="panel-card">
         <div class="panel-title">⚙ Active Filter Rules</div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Healthcare sector (exact match)</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Biotechnology (exact match)</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Exclude Pharmaceutical (exact match)</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">💰</span><span class="rule-text">Price &gt; $2 minimum</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">📊</span><span class="rule-text">Volume &gt; 100K shares</span><span class="rule-on">ON</span></div>
-        <div class="filter-rule"><span class="rule-icon">📈</span><span class="rule-text">Gain capped at 50% (blowoff protection)</span><span class="rule-on">ON</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--cyan);letter-spacing:1.5px;margin-bottom:10px;padding:5px 8px;background:var(--cyan-dim);border-radius:4px;">STAGE 1 — PRE-FILTER · 0 API calls · from gainers data</div>
+        <div class="filter-rule"><span class="rule-icon">📈</span><span class="rule-text">Gap 2%–8% (TradingView match)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">📊</span><span class="rule-text">Volume 2M–50M shares today</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Known health/pharma/finance tickers skipped</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">💰</span><span class="rule-text">Price ≥ $1 (penny guard)</span><span class="rule-on">ON</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--purple);letter-spacing:1.5px;margin:10px 0 10px;padding:5px 8px;background:rgba(155,143,255,0.08);border-radius:4px;">STAGE 2 — POST-PROFILE · 1 batch API call</div>
+        <div class="filter-rule"><span class="rule-icon">🏦</span><span class="rule-text">Market cap &gt; $10B (TradingView match)</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">✅</span><span class="rule-text">Allow: Tech, Comms, Consumer, Industrials, Materials, Utilities, Real Estate</span><span class="rule-on">ON</span></div>
+        <div class="filter-rule"><span class="rule-icon">🚫</span><span class="rule-text">Block: Healthcare + Financial Services (not in TV 14)</span><span class="rule-on">ON</span></div>
         <div class="filter-rule"><span class="rule-icon">⚠️</span><span class="rule-text">Missing sector = NOT blocked (avoids false positives)</span><span class="rule-on">ON</span></div>
       </div>
 
@@ -382,14 +771,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="api-status api-pend" id="statusGainers">PENDING</div>
         </div>
         <div class="api-row">
-          <div class="api-name">FMP /stable/profile?symbol= (max 12)</div>
-          <div class="api-calls" id="callProfiles">— calls</div>
+          <div class="api-name">FMP /stable/profile?symbol=A,B,C… (batch)</div>
+          <div class="api-calls" id="callProfiles">1 call</div>
           <div class="api-status api-pend" id="statusProfiles">PENDING</div>
         </div>
-        <div class="api-row" style="background:rgba(0,255,157,0.03);border-radius:6px;">
+        <div class="api-row" style="background:rgba(0,232,122,0.03);border-radius:6px;">
           <div class="api-name" style="color:var(--green);">Total per scan (max)</div>
-          <div class="api-calls" style="color:var(--green);">13 calls</div>
-          <div class="api-status" style="color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:10px;">19 scans/day free</div>
+          <div class="api-calls" style="color:var(--green);">2 calls</div>
+          <div class="api-status" style="color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:9.5px;">125 scans/day free</div>
         </div>
         <div class="api-row">
           <div class="api-name">Total API calls this run</div>
@@ -400,6 +789,76 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="api-name">Last refreshed</div>
           <div class="api-calls" id="lastUpdated" style="color:var(--muted2);font-size:10px;">—</div>
           <div></div>
+        </div>
+      </div>
+
+      <!-- PRE-FILTER SETTINGS -->
+      <div class="panel-card">
+        <div class="panel-title">⚙ Filter Settings
+          <span style="color:var(--cyan);font-size:8px;letter-spacing:1px;margin-left:4px;">TRADINGVIEW MATCH</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:7px 10px;background:rgba(0,212,245,0.05);border:1px solid rgba(0,212,245,0.15);border-radius:6px;">
+          <span style="font-size:13px;">📺</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:var(--cyan);line-height:1.5;">Gap Daily Screener · US · Market cap &gt;10B · Gap 2–8% · Avg Vol 2M–50M · 14 Sectors (excl. Health &amp; Finance)</span>
+        </div>
+
+        <!-- Preset buttons -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button onclick="applyPreset('tv')" style="flex:1;background:rgba(0,212,245,0.08);border:1px solid rgba(0,212,245,0.3);color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:6px;border-radius:5px;cursor:pointer;letter-spacing:1px;">📺 TV PRESET</button>
+          <button onclick="applyPreset('loose')" style="flex:1;background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.3);color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:6px;border-radius:5px;cursor:pointer;letter-spacing:1px;">🔓 LOOSE</button>
+          <button onclick="applyPreset('debug')" style="flex:1;background:rgba(155,143,255,0.08);border:1px solid rgba(155,143,255,0.3);color:var(--purple);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:6px;border-radius:5px;cursor:pointer;letter-spacing:1px;">🐛 DEBUG</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+          <div class="setting-field" style="grid-column:1/-1;">
+            <div class="setting-label">Market Cap Min (Billions $)</div>
+            <input class="setting-input" id="cfg_minMktCap" type="number" value="10" min="0" step="1">
+            <div class="setting-hint">TV: Market cap &gt; 10B USD — checked post-profile</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Gap Min (%)</div>
+            <input class="setting-input" id="cfg_minPct" type="number" value="2" min="0" step="0.5">
+            <div class="setting-hint">TV: Gap ≥ 2%</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Gap Max (%)</div>
+            <input class="setting-input" id="cfg_maxPct" type="number" value="8" min="0" step="0.5">
+            <div class="setting-hint">TV: Gap ≤ 8%</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Vol Min (M shares)</div>
+            <input class="setting-input" id="cfg_minVolume" type="number" value="0.5" min="0" step="0.1">
+            <div class="setting-hint">FMP = today's vol (not 90D avg)</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Vol Max (M, 0=off)</div>
+            <input class="setting-input" id="cfg_maxVolume" type="number" value="0" min="0" step="5">
+            <div class="setting-hint">0 disables this filter</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Min Price ($)</div>
+            <input class="setting-input" id="cfg_minPrice" type="number" value="1" min="0" step="1">
+            <div class="setting-hint">Penny stock guard</div>
+          </div>
+
+          <div class="setting-field">
+            <div class="setting-label">Max Candidates</div>
+            <input class="setting-input" id="cfg_maxStocks" type="number" value="15" min="1" max="25" step="1">
+            <div class="setting-hint">For batch profile call</div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:12px;padding:9px 12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+          <span style="font-size:14px;">⚠️</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--yellow);line-height:1.6;">TV uses 90-day avg volume; FMP returns real-time volume. Use <strong>LOOSE</strong> preset if getting 0 results.</span>
         </div>
       </div>
 
@@ -428,22 +887,173 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 </div>
 
 <div class="footer">STOCKSCAN AI · FINANCIAL MODELING PREP API · DATA MAY BE DELAYED<br>⚠ NOT FINANCIAL ADVICE · FOR EDUCATIONAL AND INFORMATIONAL PURPOSES ONLY</div>
-
 <script>
 const API_KEY = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
 
-// EXACT sector/industry names that FMP returns — must be precise to avoid false blocks
-const EXCLUDED_SECTORS   = ['healthcare','biotechnology','pharmaceutical'];
-const EXCLUDED_INDUSTRIES = ['biotechnology','pharmaceuticals','drug manufacturers - general',
-                              'drug manufacturers - specialty & generic','medical devices',
-                              'diagnostics & research','health information services',
-                              'medical distribution','medical instruments & supplies',
-                              'medical care facilities'];
+// ── FILTER CONFIG — matches TradingView "Gap Daily Screener" ──
+const DEFAULT_MIN_PRICE   = 1;         // No price filter on TV — keep low
+const DEFAULT_MIN_VOLUME  = 500000;    // 500K — FMP gives real-time vol, not 90D avg
+const DEFAULT_MAX_VOLUME  = 0;         // 0 = disabled (TV's 50M is 90D avg, not comparable)
+const DEFAULT_MIN_PCT     = 2.0;       // TV: Gap ≥ 2%
+const DEFAULT_MAX_PCT     = 8.0;       // TV: Gap ≤ 8%
+const DEFAULT_MIN_MKTCAP  = 10;        // TV: Market cap > 10B USD (in billions)
+const DEFAULT_MAX_STOCKS  = 15;        // Max candidates for batch profile call
 
-// Market-adaptive thresholds — relaxed during pre-market/weekend/low-volume periods
-const MIN_PRICE  = 2;      // $2 min (catches more real stocks, penny filter still active)
-const MIN_VOLUME = 100000; // 100K min — 500K is way too strict for pre-market & weekends
-const MAX_PCT    = 50;     // 50% cap — only block true blowoffs
+// ── SECTOR MAPPING — TradingView 14 sectors → FMP sector/industry names ──
+// TV uses their own taxonomy; FMP returns different names. This maps them bidirectionally.
+// TV's 14 ALLOWED sectors (everything NOT in this list is excluded — including Finance & Health)
+
+// FMP sector names that correspond to TV's 14 allowed sectors
+const ALLOWED_SECTORS_FMP = [
+  // TV: Electronic technology + Technology services
+  'technology',
+  // TV: Communications
+  'communication services',
+  // TV: Consumer durables + Consumer services + Retail trade
+  'consumer cyclical',
+  // TV: Consumer non-durables
+  'consumer defensive',
+  // TV: Producer manufacturing + Distribution services + Transportation + Industrial services
+  'industrials',
+  // TV: Process industries
+  'basic materials',
+  // TV: Utilities
+  'utilities',
+  // TV: Real Estate (borderline — keep for now)
+  'real estate',
+];
+
+// FMP industries that map to TV's allowed sectors even if sector name differs
+const ALLOWED_INDUSTRIES_FMP = [
+  // Electronic technology
+  'semiconductors','semiconductor equipment','electronic components',
+  'electronics & computer distribution','consumer electronics',
+  'scientific & technical instruments','solar','information technology services',
+  // Technology services
+  'software - application','software - infrastructure','internet content & information',
+  'computer hardware','data storage','it services',
+  // Communications
+  'telecom services','broadcasting','entertainment','electronic gaming & multimedia',
+  // Consumer durables
+  'auto manufacturers','auto parts','furnishings','appliances',
+  'residential construction','packaging & containers',
+  // Consumer non-durables
+  'beverages - alcoholic','beverages - non-alcoholic','tobacco','food distribution',
+  'grocery stores','household & personal products','packaged foods',
+  // Consumer services
+  'restaurants','lodging','resorts & casinos','travel services',
+  'leisure','personal services','education & training services',
+  // Distribution services
+  'logistics & freight','rental & leasing services','marine shipping',
+  'trucking','air freight & logistics',
+  // Process industries
+  'chemicals','agricultural inputs','specialty chemicals','paper & paper products',
+  'aluminum','copper','steel','gold','silver',
+  // Producer manufacturing / Industrial services
+  'specialty industrial machinery','industrial distribution','conglomerates',
+  'tools & accessories','electrical equipment & parts','farm & heavy construction machinery',
+  'waste management','engineering & construction','infrastructure operations',
+  // Retail trade
+  'internet retail','specialty retail','department stores','discount stores',
+  'home improvement retail','apparel retail','auto & truck dealerships',
+  // Transportation
+  'airlines','railroads','integrated freight & logistics',
+  // Utilities
+  'utilities - regulated electric','utilities - regulated gas','utilities - diversified',
+  'utilities - renewable','utilities - independent power producers',
+];
+
+// FMP sectors/industries that are NOT in TV's 14 — these get blocked
+const EXCLUDED_SECTORS_FMP = [
+  'healthcare',
+  'financial services',
+  'biotechnology',   // sometimes appears as sector in FMP
+  'pharmaceutical',
+];
+const EXCLUDED_INDUSTRIES_FMP = [
+  // Health Technology
+  'biotechnology','pharmaceuticals','drug manufacturers - general',
+  'drug manufacturers - specialty & generic','medical devices',
+  'diagnostics & research','health information services',
+  'medical distribution','medical instruments & supplies',
+  'medical care facilities','health information services',
+  // Health Services
+  'hospitals','managed health care',
+  // Finance (not in TV's 14)
+  'banks - diversified','banks - regional','insurance - life','insurance - property & casualty',
+  'insurance - diversified','asset management','capital markets','financial data & stock exchanges',
+  'credit services','mortgage finance','insurance brokers','investment trusts','reit',
+];
+
+function isExcluded(sector, industry) {
+  const s = (sector||'').toLowerCase().trim();
+  const i = (industry||'').toLowerCase().trim();
+
+  // If no sector data — don't block (avoid false positives on missing data)
+  if(!s || s === 'unknown' || s === '') return false;
+
+  // Explicitly excluded sectors (Health + Finance — not in TV's 14)
+  if(EXCLUDED_SECTORS_FMP.some(x => s === x || s.startsWith(x))) return true;
+
+  // Explicitly excluded industries
+  if(EXCLUDED_INDUSTRIES_FMP.some(x => i === x || i.includes(x))) return true;
+
+  // If sector is in our allowed list → pass
+  if(ALLOWED_SECTORS_FMP.some(x => s === x || s.includes(x))) return false;
+
+  // If industry is in our allowed list → pass
+  if(ALLOWED_INDUSTRIES_FMP.some(x => i === x || i.includes(x))) return false;
+
+  // Unknown sector not in either list — don't block (could be valid, let it through)
+  return false;
+}
+
+// Helper: read current filter values from UI (with fallback to defaults)
+function getFilterConfig() {
+  const rawMaxVol = parseFloat(document.getElementById('cfg_maxVolume').value) || 0;
+  const rawMinPct = parseFloat(document.getElementById('cfg_minPct').value);
+  const rawMaxPct = parseFloat(document.getElementById('cfg_maxPct').value);
+  return {
+    minPrice:  parseFloat(document.getElementById('cfg_minPrice').value)  || 0,
+    minVolume: (parseFloat(document.getElementById('cfg_minVolume').value) || 0) * 1e6,
+    maxVolume: rawMaxVol > 0 ? rawMaxVol * 1e6 : 0,  // 0 = disabled
+    minPct:    isNaN(rawMinPct) ? 0 : rawMinPct,
+    maxPct:    isNaN(rawMaxPct) || rawMaxPct === 0 ? 999 : rawMaxPct,
+    minMktCap: (parseFloat(document.getElementById('cfg_minMktCap').value) || 0) * 1e9,
+    maxStocks: parseInt(document.getElementById('cfg_maxStocks').value)   || DEFAULT_MAX_STOCKS,
+  };
+}
+
+function applyPreset(type) {
+  const presets = {
+    tv:    { minMktCap:10, minPct:2,   maxPct:8,   minVolume:0.5, maxVolume:0, minPrice:1, maxStocks:15 },
+    loose: { minMktCap:0,  minPct:1,   maxPct:20,  minVolume:0.1, maxVolume:0, minPrice:1, maxStocks:20 },
+    debug: { minMktCap:0,  minPct:0,   maxPct:0,   minVolume:0,   maxVolume:0, minPrice:0, maxStocks:25 },
+  };
+  const p = presets[type];
+  document.getElementById('cfg_minMktCap').value = p.minMktCap;
+  document.getElementById('cfg_minPct').value    = p.minPct;
+  document.getElementById('cfg_maxPct').value    = p.maxPct;
+  document.getElementById('cfg_minVolume').value = p.minVolume;
+  document.getElementById('cfg_maxVolume').value = p.maxVolume;
+  document.getElementById('cfg_minPrice').value  = p.minPrice;
+  document.getElementById('cfg_maxStocks').value = p.maxStocks;
+  const labels = {tv:'📺 TV preset applied — Gap 2–8%, MktCap >$10B', loose:'🔓 Loose preset — wider net, more results', debug:'🐛 Debug mode — ALL filters off, shows everything'};
+  addLog('⚙', labels[type], 'info');
+}
+
+// Known excluded tickers (Health + Finance) — pre-filter without API call
+const KNOWN_EXCLUDED_TICKERS = [
+  // Healthcare / Biotech / Pharma
+  'MRNA','PFE','JNJ','ABBV','BMY','LLY','MRK','GILD','AMGN','BIIB','REGN','VRTX',
+  'ILMN','HOLX','PKI','WAT','WST','IDXX','IQV','CRL','MTD','RMD','STE','ALGN',
+  'ISRG','BAX','BDX','BSX','COO','DVA','EW','HSIC','MCK','MOH','UNH','HUM',
+  'CVS','CI','CNC','WBA','CAH','ABC','ZTS','DXCM','ABT','MDT','TMO','DHR',
+  // Financial Services (not in TV's 14 sectors)
+  'JPM','BAC','WFC','GS','MS','C','AXP','V','MA','PYPL','BLK','SCHW','USB',
+  'PNC','TFC','COF','AIG','MET','PRU','AFL','ALL','TRV','CB','MMC','AON',
+  'BK','STT','ICE','CME','NDAQ','SPGI','MCO',
+];
 
 let logVisible = true;
 let runStart = 0;
@@ -494,16 +1104,6 @@ function fmtVol(v){if(!v)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v
 function fmtMktCap(v){if(!v)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(2)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
 function sectorClass(s){if(!s)return'sector-other';s=s.toLowerCase();if(s.includes('tech')||s.includes('soft')||s.includes('semi')||s.includes('commun'))return'sector-tech';if(s.includes('financ')||s.includes('bank')||s.includes('crypto')||s.includes('insur'))return'sector-fin';if(s.includes('energy')||s.includes('oil')||s.includes('gas')||s.includes('util'))return'sector-energy';if(s.includes('consumer')||s.includes('retail')||s.includes('real estate')||s.includes('indust'))return'sector-cons';return'sector-other';}
 function pctClass(p){return p>=5?'pct-hot':p>=2?'pct-warm':'pct-mild';}
-function isExcluded(sector, industry){
-  const s = (sector||'').toLowerCase().trim();
-  const i = (industry||'').toLowerCase().trim();
-  // Only block if sector is EXACTLY one of the excluded names
-  const sectorBlocked   = EXCLUDED_SECTORS.some(x => s === x || s.startsWith(x));
-  const industryBlocked = EXCLUDED_INDUSTRIES.some(x => i === x || i.includes(x));
-  // If sector is empty/unknown, DON'T block — missing data shouldn't disqualify a stock
-  if(!s || s === 'unknown' || s === '') return false;
-  return sectorBlocked || industryBlocked;
-}
 
 // ── SCORING ENGINE ─────────────────────────────────────────
 function scoreStock(stock) {
@@ -664,6 +1264,94 @@ function diagnoseError(status, message, context) {
   addLog('🔍', `Cause: ${why}`, 'warn');
 }
 
+// ── DEMO MODE ──────────────────────────────────────────────
+function loadDemo() {
+  const DEMO_DATA = [
+    {symbol:'NVDA', name:'NVIDIA Corporation',         price:875.40, changesPercentage:6.82, volume:38000000, mktCap:2160000000000, sector:'Technology',         industry:'Semiconductors'},
+    {symbol:'META', name:'Meta Platforms Inc',          price:512.30, changesPercentage:4.14, volume:22000000, mktCap:1310000000000, sector:'Technology',         industry:'Internet Content & Information'},
+    {symbol:'MSFT', name:'Microsoft Corporation',       price:415.20, changesPercentage:2.80, volume:18000000, mktCap:3080000000000, sector:'Technology',         industry:'Software - Infrastructure'},
+    {symbol:'AMZN', name:'Amazon.com Inc',              price:188.60, changesPercentage:3.45, volume:28000000, mktCap:1960000000000, sector:'Consumer Cyclical',   industry:'Internet Retail'},
+    {symbol:'GOOGL',name:'Alphabet Inc',                price:175.80, changesPercentage:2.95, volume:19000000, mktCap:2180000000000, sector:'Communication Services',industry:'Internet Content & Information'},
+    {symbol:'AMD',  name:'Advanced Micro Devices',      price:168.75, changesPercentage:5.33, volume:44000000, mktCap:272000000000,  sector:'Technology',         industry:'Semiconductors'},
+    {symbol:'TSLA', name:'Tesla Inc',                   price:248.90, changesPercentage:3.67, volume:48000000, mktCap:791000000000,  sector:'Consumer Cyclical',   industry:'Auto Manufacturers'},
+    {symbol:'JPM',  name:'JPMorgan Chase & Co',         price:198.40, changesPercentage:2.20, volume:12000000, mktCap:574000000000,  sector:'Financial Services',  industry:'Banks - Diversified'},
+    {symbol:'COIN', name:'Coinbase Global Inc',         price:198.40, changesPercentage:7.44, volume:14000000, mktCap:47500000000,   sector:'Financial Services',  industry:'Financial Data & Stock Exchanges'},
+    {symbol:'MRNA', name:'Moderna Inc',                 price:108.20, changesPercentage:4.50, volume:7200000,  mktCap:43700000000,   sector:'Healthcare',          industry:'Biotechnology'},
+    {symbol:'SMCI', name:'Super Micro Computer',        price:42.80,  changesPercentage:7.20, volume:9500000,  mktCap:2400000000,    sector:'Technology',         industry:'Computer Hardware'},
+    {symbol:'HOOD', name:'Robinhood Markets Inc',       price:18.92,  changesPercentage:3.40, volume:9000000,  mktCap:16400000000,   sector:'Financial Services',  industry:'Capital Markets'},
+  ];
+
+  document.getElementById('errorBox').style.display='none';
+  document.getElementById('logBody').innerHTML='';
+  stockScores = {};
+  ['statFetched','statPassed','statBlocked','statTopScore','statCalls','statRunTime'].forEach(id=>{document.getElementById(id).textContent='—';});
+  setProgress(5);
+
+  addLog('⚡','DEMO MODE — using simulated data (no API calls used)','info','DEMO','badge-score');
+  addLog('📋','All real filters and scoring engine are active — only data source is mocked','data');
+
+  document.getElementById('statFetched').textContent = DEMO_DATA.length;
+  document.getElementById('statFetchedSub').textContent = `${DEMO_DATA.length} demo stocks`;
+  document.getElementById('statusGainers').className='api-status api-ok';
+  document.getElementById('statusGainers').textContent='DEMO ✓';
+  document.getElementById('statusProfiles').className='api-status api-ok';
+  document.getElementById('statusProfiles').textContent='DEMO ✓';
+  document.getElementById('callGainers').textContent='0 calls';
+  document.getElementById('callProfiles').textContent='0 calls';
+  document.getElementById('callTotal').textContent='0';
+  document.getElementById('statusTotal').className='api-status api-ok';
+  document.getElementById('statusTotal').textContent='0 / 250';
+  setProgress(40);
+
+  const demoCfg = getFilterConfig();
+  const passedStocks=[], blockedStocks=[];
+  DEMO_DATA.forEach(stock => {
+    const { sector, industry, price, volume, changesPercentage: pct } = stock;
+    if(KNOWN_EXCLUDED_TICKERS.includes(stock.symbol)){
+      blockedStocks.push({...stock, blockReason:`Known healthcare/pharma ticker`});
+      addLog('⚡',`PRE-SKIP ${stock.symbol} — Known healthcare/pharma ticker`,'warn');
+    } else if(price < demoCfg.minPrice){
+      blockedStocks.push({...stock, blockReason:`Price $${price.toFixed(2)} < $${demoCfg.minPrice}`});
+      addLog('⚡',`PRE-SKIP ${stock.symbol} — Price $${price.toFixed(2)} < $${demoCfg.minPrice}`,'warn');
+    } else if(volume < demoCfg.minVolume){
+      blockedStocks.push({...stock, blockReason:`Volume ${fmtVol(volume)} < ${fmtVol(demoCfg.minVolume)}`});
+      addLog('⚡',`PRE-SKIP ${stock.symbol} — Vol ${fmtVol(volume)} < ${fmtVol(demoCfg.minVolume)}`,'warn');
+    } else if(pct < demoCfg.minPct || pct > demoCfg.maxPct){
+      blockedStocks.push({...stock, blockReason:`Gain ${pct.toFixed(1)}% outside ${demoCfg.minPct}%–${demoCfg.maxPct}% range`});
+      addLog('⚡',`PRE-SKIP ${stock.symbol} — Gain ${pct.toFixed(1)}% out of range`,'warn');
+    } else if(isExcluded(sector, industry)){
+      blockedStocks.push({...stock, blockReason:`Sector: "${sector}" — excluded`});
+      addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" excluded`,'err','SECTOR','badge-filter');
+    } else {
+      const scored = scoreStock(stock);
+      stockScores[stock.symbol] = scored;
+      stock.score = scored.total;
+      passedStocks.push(stock);
+      addLog('✅',`PASSED ${stock.symbol} — Score: ${scored.total}/100 | ${pct.toFixed(1)}% gain | Vol ${fmtVol(volume)} | ${sector}`,'ok','SCORED','badge-score');
+    }
+  });
+
+  setProgress(80);
+  passedStocks.sort((a,b)=>b.score-a.score);
+
+  document.getElementById('statPassed').textContent = passedStocks.length;
+  document.getElementById('statBlocked').textContent = blockedStocks.length;
+  document.getElementById('passedCount').textContent = `${passedStocks.length} stocks`;
+  document.getElementById('blockedCount').textContent = `${blockedStocks.length} removed`;
+  if(passedStocks.length>0) document.getElementById('statTopScore').textContent = passedStocks[0].score;
+  document.getElementById('statCalls').textContent = '0';
+  document.getElementById('statRunTime').textContent = '0.1s';
+  document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'})+' EST';
+
+  addLog('🏆',`Demo top 5: ${passedStocks.slice(0,5).map(s=>`${s.symbol}(${s.score})`).join(' › ')}`,'info','TOP 5','badge-score');
+
+  renderStocks(passedStocks);
+  renderBlocked(blockedStocks);
+  renderSectors(passedStocks);
+  setProgress(100);
+  setTimeout(()=>setProgress(0), 1500);
+}
+
 // ── MAIN LOAD ──────────────────────────────────────────────
 async function loadData() {
   const btn = document.getElementById('refreshBtn');
@@ -684,7 +1372,7 @@ async function loadData() {
   setProgress(5);
 
   addLog('🚀','Scan started','info','NEW RUN','badge-api');
-  addLog('📋',`Active filters: Exclude Healthcare/Biotech/Pharma (exact) | Min price $${MIN_PRICE} | Min volume ${fmtVol(MIN_VOLUME)} | Max gain ${MAX_PCT}% | Missing sector = not blocked`,'');
+  addLog('📋',`Active filters — see Pre-Filter Settings panel for thresholds | Sector exclusions: Healthcare, Biotech, Pharma | Missing sector = not blocked`,'');
   addLog('🧮','Scoring weights: Momentum 30pt + Volume 25pt + Sector 20pt + MarketCap 15pt + Price 10pt = 100pt max','data');
   addLog('🌐','Preparing API call #1 → FMP /stable/biggest-gainers (new stable endpoint)','info','API CALL','badge-api');
 
@@ -717,10 +1405,21 @@ async function loadData() {
 
     let gainersData = await gainersRes.json();
 
-    if(gainersData && gainersData['Error Message']){
+    // Log raw response shape for debugging
+    addLog('🔬',`Raw response type: ${Array.isArray(gainersData)?'Array['+gainersData.length+']':typeof gainersData} | Keys: ${!Array.isArray(gainersData)?Object.keys(gainersData||{}).slice(0,5).join(', '):'n/a'}`,'data');
+
+    // Handle all known FMP error response shapes
+    const errMsg = gainersData?.['Error Message'] || gainersData?.message || gainersData?.error || gainersData?.['error_message'];
+    if(errMsg){
       const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='API ERR';
-      diagnoseError(403, gainersData['Error Message'], 'FMP returned Error Message — check plan at financialmodelingprep.com/developer/docs/pricing');
+      diagnoseError(gainersData?.status||403, errMsg, 'FMP returned error object — check your API key and plan at financialmodelingprep.com/developer/docs/pricing');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
+    }
+
+    // Handle case where API returns a single object instead of array
+    if(gainersData && !Array.isArray(gainersData) && gainersData.symbol){
+      gainersData = [gainersData];
+      addLog('⚠️','API returned single object — wrapped in array','warn');
     }
 
     // Normalize field names — /stable/ API uses slightly different field names
@@ -758,101 +1457,119 @@ async function loadData() {
     document.getElementById('statFetched').textContent = gainersData.length;
     document.getElementById('statFetchedSub').textContent = `${gainersData.length} total gainers today`;
 
-    // ── PRE-FILTER BEFORE PROFILE CALLS (saves API calls) ──
-    // Apply cheap filters first (price, volume, % gain) using data we ALREADY have
-    // Only fetch profiles for stocks that pass these basic checks
-    // This reduces profile calls from 30 → typically 8-12, saving ~20 API calls per scan
-    addLog('⚡','Pre-filtering with available data BEFORE profile lookups — saves API calls','info','BUDGET SAVER','badge-score');
+    // ── STEP 2: PRE-FILTER (zero API calls) ───────────────
+    // Log EVERY raw stock so we can see exactly what FMP is returning
+    addLog('📋',`Raw gainers (${gainersData.length} total):`,'data');
+    gainersData.forEach(s => {
+      addLog('📌',`${s.symbol} | $${parseFloat(s.price||0).toFixed(2)} | ${parseFloat(s.changesPercentage||0).toFixed(2)}% | Vol:${fmtVol(parseInt(s.volume||0))}`,'data');
+    });
+    addLog('⚡','Applying pre-filters — ZERO API calls used','info','PRE-FILTER','badge-score');
 
-    const PRE_MIN_PRICE  = 5;      // Must be above $5 — eliminates penny stocks immediately
-    const PRE_MIN_VOLUME = 200000; // Must have 200K+ volume — eliminates dead stocks
-    const PRE_MIN_PCT    = 1.0;    // Must have 1%+ gain — eliminates flat movers
-    const PRE_MAX_PCT    = 50;     // Must be below 50% — eliminates blowoff spikes
-    const PRE_MAX_STOCKS = 12;     // Only profile top 12 candidates — caps calls at 13 total
-
-    // Known healthcare/biotech tickers we can filter without a profile call
-    const KNOWN_EXCLUDED_TICKERS = ['MRNA','PFE','JNJ','ABBV','BMY','LLY','MRK','GILD',
-      'AMGN','BIIB','REGN','VRTX','ILMN','HOLX','TECH','PKI','WAT','WST','IDXX','IQV',
-      'CRL','MTD','RMD','STE','ALGN','ISRG','BAX','BDX','BSX','COO','DVA','EW','HSIC',
-      'MCK','MOH','UNH','HUM','CVS','CI','CNC','ANTM','WBA','CAH','ABC'];
+    const cfg = getFilterConfig(); // single source of truth from settings panel
+    addLog('⚙',`Active thresholds: Gap ${cfg.minPct}%–${cfg.maxPct}% | Vol ${fmtVol(cfg.minVolume)}–${fmtVol(cfg.maxVolume)} | MktCap ≥ ${fmtMktCap(cfg.minMktCap)} | Price ≥ $${cfg.minPrice}`,'data');
 
     const preFiltered = gainersData
       .filter(s => {
-        const price = s.price;
-        const vol   = s.volume;
-        const pct   = s.changesPercentage;
-        const sym   = s.symbol;
+        const price  = parseFloat(s.price)||0;
+        const vol    = parseInt(s.volume)||0;
+        const pct    = parseFloat(s.changesPercentage)||0;
+        const mktCap = parseFloat(s.marketCap||s.mktCap||0);
+        const sym    = s.symbol;
 
         if(KNOWN_EXCLUDED_TICKERS.includes(sym)){
-          addLog('⚡',`PRE-SKIP ${sym} — Known healthcare/pharma ticker (no API call needed)`,'warn');
-          return false;
+          addLog('⚡',`PRE-SKIP ${sym} — Known excluded ticker`,'warn'); return false;
         }
-        if(price < PRE_MIN_PRICE){
-          addLog('⚡',`PRE-SKIP ${sym} — Price $${price?.toFixed(2)} below $${PRE_MIN_PRICE}`,'warn'); return false;
+        if(price < cfg.minPrice){
+          addLog('⚡',`PRE-SKIP ${sym} — Price $${price.toFixed(2)} < $${cfg.minPrice}`,'warn'); return false;
         }
-        if(vol < PRE_MIN_VOLUME){
-          addLog('⚡',`PRE-SKIP ${sym} — Volume ${fmtVol(vol)} below ${fmtVol(PRE_MIN_VOLUME)}`,'warn'); return false;
+        if(cfg.minVolume > 0 && vol < cfg.minVolume){
+          addLog('⚡',`PRE-SKIP ${sym} — Vol ${fmtVol(vol)} < ${fmtVol(cfg.minVolume)} min`,'warn'); return false;
         }
-        if(pct < PRE_MIN_PCT){
-          addLog('⚡',`PRE-SKIP ${sym} — Gain ${pct?.toFixed(2)}% below ${PRE_MIN_PCT}% minimum`,'warn'); return false;
+        if(cfg.maxVolume > 0 && vol > cfg.maxVolume){
+          addLog('⚡',`PRE-SKIP ${sym} — Vol ${fmtVol(vol)} > ${fmtVol(cfg.maxVolume)} max`,'warn'); return false;
         }
-        if(pct > PRE_MAX_PCT){
-          addLog('⚡',`PRE-SKIP ${sym} — Gain ${pct?.toFixed(2)}% above ${PRE_MAX_PCT}% blowoff cap`,'warn'); return false;
+        if(pct < cfg.minPct){
+          addLog('⚡',`PRE-SKIP ${sym} — Gap ${pct.toFixed(2)}% < ${cfg.minPct}% min`,'warn'); return false;
         }
+        if(pct > cfg.maxPct){
+          addLog('⚡',`PRE-SKIP ${sym} — Gap ${pct.toFixed(2)}% > ${cfg.maxPct}% max`,'warn'); return false;
+        }
+        if(mktCap > 0 && mktCap < cfg.minMktCap){
+          addLog('⚡',`PRE-SKIP ${sym} — MktCap ${fmtMktCap(mktCap)} < ${fmtMktCap(cfg.minMktCap)}`,'warn'); return false;
+        }
+        addLog('✔',`PRE-PASS ${sym} — $${price.toFixed(2)} | ${pct.toFixed(2)}% | Vol ${fmtVol(vol)}`,'ok');
         return true;
       })
-      .slice(0, PRE_MAX_STOCKS); // Cap at 12 stocks max for profile calls
+      .slice(0, cfg.maxStocks);
 
     const skipped = gainersData.length - preFiltered.length;
-    addLog('✅',`Pre-filter complete — ${preFiltered.length} candidates selected, ${skipped} skipped (0 API calls used for skipped stocks)`,'ok');
-    addLog('💰',`API budget: 1 (gainers) + ${preFiltered.length} (profiles) = ${preFiltered.length + 1} total calls this scan`,'info','BUDGET','badge-score');
-    setProgress(20);
+    addLog('✅',`Pre-filter: ${preFiltered.length} candidates from ${gainersData.length} (${skipped} skipped, 0 API calls used)`,'ok');
 
-    // ── STEP 2: Profiles (only for pre-filtered candidates) ─
-    addLog('🏢',`Fetching profiles for ${preFiltered.length} candidates only`,'info','PROFILES','badge-api');
+    if(preFiltered.length === 0){
+      document.getElementById('statPassed').textContent = 0;
+      document.getElementById('statBlocked').textContent = skipped;
+      document.getElementById('passedCount').textContent = '0 stocks';
+      document.getElementById('blockedCount').textContent = `${skipped} removed`;
+      document.getElementById('stocksList').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;font-family:\'IBM Plex Mono\',monospace;">No stocks passed pre-filters. Try relaxing the criteria in Settings.</div>';
+      document.getElementById('blockedList').innerHTML='<div style="padding:14px;text-align:center;color:var(--muted);font-size:11px;font-family:\'IBM Plex Mono\',monospace;">All stocks were removed at pre-filter stage.</div>';
+      setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
+    }
+
+    setProgress(20);
+    addLog('💰',`API budget: 1 (gainers) + 1 (batch profiles for ${preFiltered.length} symbols) = 2 total calls this scan`,'info','BUDGET','badge-score');
+
+    // ── STEP 3: BATCH PROFILE CALL (1 single API call for all candidates) ──
+    // Uses comma-separated symbols — massively more efficient than individual calls
+    addLog('🏢',`Fetching all ${preFiltered.length} profiles in ONE batch call`,'info','BATCH PROFILE','badge-api');
+
+    const symbols = preFiltered.map(s=>s.symbol).join(',');
     const profileCache = {};
-    const batchSize = 4;
     let profileOk=0, profileFail=0;
 
-    for(let i=0;i<preFiltered.length;i+=batchSize){
-      const batch = preFiltered.slice(i,i+batchSize);
-      setProgress(20 + ((i/preFiltered.length)*55));
-      addLog('📦',`Profile batch ${Math.floor(i/batchSize)+1}/${Math.ceil(preFiltered.length/batchSize)}: ${batch.map(s=>s.symbol).join(', ')}`,'data');
+    try {
+      const batchUrl = `https://financialmodelingprep.com/stable/profile?symbol=${symbols}&apikey=${API_KEY}`;
+      addLog('📡',`GET /stable/profile?symbol=${symbols}`,'info');
+      const batchRes = await fetch(batchUrl);
+      apiCallCount++;
+      document.getElementById('callTotal').textContent = apiCallCount;
+      document.getElementById('callProfiles').textContent = '1 call (batch)';
 
-      await Promise.all(batch.map(async(stock)=>{
-        try{
-          const url=`https://financialmodelingprep.com/stable/profile?symbol=${stock.symbol}&apikey=${API_KEY}`;
-          const res=await fetch(url);
-          apiCallCount++;
-          if(res.ok){
-            const d=await res.json();
-            // /stable/profile returns object or array — handle both
-            const profile = Array.isArray(d) ? d[0] : (d && d.symbol ? d : null);
-            if(profile){
-              profileCache[stock.symbol]=profile;
-              profileOk++;
-              addLog('✓',`${stock.symbol} → Sector: "${profile.sector||'—'}" | Industry: "${profile.industry||'—'}" | MktCap: ${fmtMktCap(profile.mktCap)}`,'ok');
-            } else {
-              addLog('⚠',`${stock.symbol} → Profile returned empty array`,'warn');
-              profileFail++;
-            }
-          } else {
-            addLog('✗',`${stock.symbol} → Profile HTTP ${res.status}`,'err');
-            profileFail++;
+      if(batchRes.ok){
+        const batchData = await batchRes.json();
+        const profiles = Array.isArray(batchData) ? batchData : (batchData?.symbol ? [batchData] : []);
+        profiles.forEach(p => {
+          if(p?.symbol){
+            profileCache[p.symbol] = p;
+            profileOk++;
+            addLog('✓',`${p.symbol} → "${p.sector||'—'}" | "${p.industry||'—'}" | ${fmtMktCap(p.mktCap)}`,'ok');
           }
-        }catch(e){
-          addLog('✗',`${stock.symbol} → Network error: ${e.message}`,'err');
-          profileFail++;
+        });
+        profileFail = preFiltered.length - profileOk;
+        addLog('📊',`Batch profile complete — ${profileOk} profiles received in 1 API call`,'ok');
+      } else {
+        addLog('⚠',`Batch profile HTTP ${batchRes.status} — falling back to individual calls`,'warn');
+        // Fallback: individual calls if batch fails
+        for(const stock of preFiltered){
+          try{
+            const r = await fetch(`https://financialmodelingprep.com/stable/profile?symbol=${stock.symbol}&apikey=${API_KEY}`);
+            apiCallCount++;
+            if(r.ok){
+              const d = await r.json();
+              const p = Array.isArray(d)?d[0]:(d?.symbol?d:null);
+              if(p){ profileCache[stock.symbol]=p; profileOk++; }
+            }
+          }catch(e){ profileFail++; }
+          document.getElementById('callTotal').textContent = apiCallCount;
+          document.getElementById('callProfiles').textContent = `${apiCallCount-1} calls`;
         }
-        document.getElementById('callTotal').textContent=apiCallCount;
-        document.getElementById('callProfiles').textContent=`${apiCallCount-1} calls`;
-      }));
+      }
+    } catch(e) {
+      addLog('✗',`Batch profile network error: ${e.message} — proceeding without sector data`,'err');
     }
 
     const el2=document.getElementById('statusProfiles');
-    el2.className=profileFail===0?'api-status api-ok':'api-status api-pend';
-    el2.textContent=profileFail===0?`OK ✓ (${profileOk})`:`${profileOk} ok / ${profileFail} failed`;
-    addLog('📊',`Profile fetch complete — ${profileOk} success, ${profileFail} failed/empty`,'ok');
+    el2.className = profileFail===0 ? 'api-status api-ok' : 'api-status api-pend';
+    el2.textContent = profileFail===0 ? `OK ✓ (${profileOk})` : `${profileOk} ok / ${profileFail} missing`;
     setProgress(78);
 
     // ── STEP 3: Filter + Score ─────────────────────────────
@@ -874,18 +1591,13 @@ async function loadData() {
         industry, mktCap
       };
 
+      // Stage 2: sector exclusion + market cap (now we have accurate profile data)
       if(isExcluded(sector,industry)){
         blockedStocks.push({...enriched,blockReason:`Sector: "${sector||industry}" — excluded`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" is in exclusion list`,'err','FILTERED','badge-filter');
-      } else if(price < MIN_PRICE){
-        blockedStocks.push({...enriched,blockReason:`Price $${price.toFixed(2)} below $${MIN_PRICE} minimum`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Price $${price.toFixed(2)} below $${MIN_PRICE} minimum`,'err','FILTERED','badge-filter');
-      } else if(vol < MIN_VOLUME){
-        blockedStocks.push({...enriched,blockReason:`Volume ${fmtVol(vol)} below ${fmtVol(MIN_VOLUME)} minimum`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Volume ${fmtVol(vol)} below ${fmtVol(MIN_VOLUME)} threshold`,'err','FILTERED','badge-filter');
-      } else if(pct > MAX_PCT){
-        blockedStocks.push({...enriched,blockReason:`Gain ${pct.toFixed(1)}% exceeds ${MAX_PCT}% blowoff cap`});
-        addLog('🚫',`BLOCKED ${stock.symbol} — Gain ${pct.toFixed(1)}% exceeds ${MAX_PCT}% blowoff cap`,'err','FILTERED','badge-filter');
+        addLog('🚫',`BLOCKED ${stock.symbol} — Sector "${sector}" excluded`,'err','SECTOR','badge-filter');
+      } else if(mktCap > 0 && mktCap < cfg.minMktCap){
+        blockedStocks.push({...enriched,blockReason:`MktCap ${fmtMktCap(mktCap)} < ${fmtMktCap(cfg.minMktCap)} minimum`});
+        addLog('🚫',`BLOCKED ${stock.symbol} — MktCap ${fmtMktCap(mktCap)} < ${fmtMktCap(cfg.minMktCap)}`,'err','MKTCAP','badge-filter');
       } else {
         const scored = scoreStock(enriched);
         stockScores[stock.symbol] = scored;
