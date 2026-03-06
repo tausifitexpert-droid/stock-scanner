@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live AI Stock Scanner</title>
+<title>StockScan AI v2 — most-active</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
@@ -766,7 +766,7 @@ body::before{
       <div class="panel-card">
         <div class="panel-title">🔗 API Resources Used This Run</div>
         <div class="api-row">
-          <div class="api-name">FMP /stable/most-active (primary source)</div>
+          <div class="api-name">FMP /stable/most-actives (primary source)</div>
           <div class="api-calls" id="callGainers">1 call</div>
           <div class="api-status api-pend" id="statusGainers">PENDING</div>
         </div>
@@ -1186,7 +1186,7 @@ function diagnoseError(status, message, context) {
     what = 'HTTP 403 Forbidden — Server refused your request';
     why = 'Your API key exists but the endpoint returned 403. This was caused by using the old legacy URL (/stock_market/gainers). The app now uses the correct URL (/api/v3/gainers). If you still see 403, your daily 250-call limit may be exhausted.';
     fixes = [
-      'Paste this URL in a new browser tab to test: https://financialmodelingprep.com/stable/most-active?apikey=' + API_KEY,
+      'Paste this URL in a new browser tab to test: https://financialmodelingprep.com/stable/most-actives?apikey=' + API_KEY,
       'If it shows stock data → your key works but there is a CORS issue — host the file on GitHub Pages',
       'If it shows {"Error Message":"Legacy Endpoint..."} → your account was created after Aug 31 2025 and v3 is blocked (this app now uses /stable/ which should fix it)',
       'If it shows {"Error Message":"Limit Reach..."} → your daily 250-call limit is exhausted, resets at midnight UTC (8PM EST)',
@@ -1379,11 +1379,11 @@ async function loadData() {
     // ── STEP 1: most-active = primary source (has volume + marketCap + % change) ──
     // biggest-gainers is NOT used — it returns penny stocks with no volume data
     setProgress(10);
-    addLog('🌐','Fetching /stable/most-active — primary source (volume + marketCap + % change)','info','API CALL','badge-api');
+    addLog('🌐','Fetching /stable/most-actives — primary source (volume + marketCap + % change)','info','API CALL','badge-api');
 
     let activesRes;
     try {
-      activesRes = await fetch(`https://financialmodelingprep.com/stable/most-active?apikey=${API_KEY}`);
+      activesRes = await fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${API_KEY}`);
     } catch(netErr) {
       diagnoseError(0, netErr.message, 'Network error — make sure you opened this via http://localhost:8080, not file://');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
@@ -1395,7 +1395,7 @@ async function loadData() {
 
     if(!activesRes.ok){
       const el=document.getElementById('statusGainers'); el.className='api-status api-err'; el.textContent='ERROR '+activesRes.status;
-      diagnoseError(activesRes.status, activesRes.statusText, 'Fetching /stable/most-active');
+      diagnoseError(activesRes.status, activesRes.statusText, 'Fetching /stable/most-actives');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
@@ -1410,7 +1410,7 @@ async function loadData() {
     }
 
     if(!Array.isArray(activesRaw) || activesRaw.length === 0){
-      diagnoseError(200,'No data returned from /stable/most-active','US market may be closed. Hours: Mon–Fri 9:30AM–4:00PM EST.');
+      diagnoseError(200,'No data returned from /stable/most-actives','US market may be closed. Hours: Mon–Fri 9:30AM–4:00PM EST.');
       setProgress(0); btn.disabled=false; btn.textContent='⟳ REFRESH'; return;
     }
 
