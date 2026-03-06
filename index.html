@@ -384,12 +384,31 @@ async function fetchActives() {
 async function fetchProfiles(symbols) {
   lg(`GET /stable/profile (${symbols.length} symbols)`, 'data');
   try {
+    // Try batch first
     const r = await fetch(`https://financialmodelingprep.com/stable/profile?symbol=${symbols.join(',')}&apikey=${FMP}`);
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const arr = await r.json();
+    const raw = await r.json();
+    const arr = Array.isArray(raw) ? raw : (raw?.symbol ? [raw] : []);
     const map = {};
-    (Array.isArray(arr)?arr:[arr]).forEach(p=>{ if(p?.symbol) map[p.symbol]=p; });
-    lg(`Profiles: ${Object.keys(map).length} received`, 'data', 'ok');
+    arr.forEach(p=>{ if(p?.symbol) map[p.symbol]=p; });
+
+    // If batch returned nothing, try fetching first 5 individually
+    if(Object.keys(map).length === 0) {
+      lg('Batch profile empty — trying individual calls for top 5', 'data', 'warn');
+      for(const sym of symbols.slice(0,5)) {
+        try {
+          const r2 = await fetch(`https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`);
+          if(r2.ok) {
+            const d = await r2.json();
+            const p = Array.isArray(d)?d[0]:d;
+            if(p?.symbol) map[p.symbol] = p;
+          }
+        } catch(e) {}
+        await new Promise(r=>setTimeout(r,100));
+      }
+    }
+
+    lg(`Profiles: ${Object.keys(map).length} received (${Object.keys(map).join(' ')})`, 'data', Object.keys(map).length>0?'ok':'warn');
     return map;
   } catch(e) { lg(`Profile error: ${e.message}`, 'err', 'warn'); return {}; }
 }
@@ -538,20 +557,27 @@ async function runScan() {
     // Enrich with profile data
     const enriched = candidates.slice(0,25).map(s => {
       const p = profiles[s.symbol]||{};
+      const mktCap = parseFloat(s.mktCap||p.mktCap||p.marketCap||p.marketCapitalization||0);
       return {
         ...s,
-        name:   p.companyName||s.name,
-        sector: p.sector||'Unknown',
+        name:     p.companyName||p.name||s.name,
+        sector:   p.sector||'Unknown',
         industry: p.industry||'Unknown',
-        mktCap: s.mktCap||p.mktCap||0,
-        volAvg: p.volAvg||p.averageVolume||0,
-        beta:   p.beta||null,
+        mktCap,
+        volAvg:   parseFloat(p.volAvg||p.averageVolume||p.avgVolume||0),
+        beta:     parseFloat(p.beta||0)||null,
       };
-    }).filter(s => !minMktCap || s.mktCap >= minMktCap);
+    });
+    // Only apply mktCap filter if we actually got profile data with mktCap
+    const profilesHaveMktCap = enriched.some(s => s.mktCap > 0);
+    const enrichedFiltered = profilesHaveMktCap && minMktCap
+      ? enriched.filter(s => s.mktCap >= minMktCap)
+      : enriched;
+    lg(`Enriched: ${enrichedFiltered.length} stocks (mktCap data: ${profilesHaveMktCap?'yes':'no — skipping mktCap filter'})`, 'data', enrichedFiltered.length>0?'ok':'warn');
 
     // STEP 3: Score & rank
     stepState('s3','active'); status('Scoring candidates…',true); prog(62);
-    const scored = enriched.map(s => {
+    const scored = enrichedFiltered.map(s => {
       const { score, reasons } = scoreStock(s);
       const thesis = generateThesis({...s, score});
       return { ...s, score, reasons, thesis };
