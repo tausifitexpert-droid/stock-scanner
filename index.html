@@ -288,7 +288,7 @@ function stepState(id,s){document.getElementById(id).className='step'+(s==='acti
 // ── UTILS ──────────────────────────────────────────────────────
 const f2=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(2);
 const f1=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(1);
-function fV(v){if(!v||v<1)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return String(v);}
+function fV(v){if(v===null||v===undefined||v===''||isNaN(v))return'—';const n=parseInt(v);if(n<=0)return'—';if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return String(n);}
 function fC(v){if(!v||v<1)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(1)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(0)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
 function sc(n){return n>=70?'a':n>=45?'b':'c';}
 
@@ -309,15 +309,24 @@ const SKIP_SYM = new Set([
 // Name keywords for leveraged/inverse/ETF products
 const SKIP_NAME = /\b(2x|3x|ultra|short|inverse|daily|leveraged|bear|bull etf|proshares|direxion|graniteShares|wisdomtree fund|ishares|vanguard etf|spdr)\b/i;
 // Sectors to exclude
-const EXCL_SECTORS = new Set(['Healthcare','Financial Services','Real Estate','Utilities']);
-// Industries to exclude within allowed sectors (extra precision)
+// Sectors fully excluded
+const EXCL_SECTORS = new Set(['Financial Services','Real Estate','Utilities']);
+// Industries excluded regardless of sector (pure pharma/biotech/banking)
 const EXCL_INDUSTRIES = new Set([
-  'Biotechnology','Drug Manufacturers','Medical Devices','Medical Instruments',
-  'Diagnostics & Research','Health Information Services','Medical Distribution',
-  'Banks—Regional','Banks—Diversified','Insurance','Capital Markets',
-  'Asset Management','Insurance—Diversified','Mortgage Finance',
-  'Credit Services','Financial Conglomerates',
+  'Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic',
+  'Pharmaceutical Retailers','Medical Instruments & Supplies',
+  'Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty',
+  'Insurance—Diversified','Capital Markets','Asset Management',
+  'Mortgage Finance','Credit Services','Financial Conglomerates',
 ]);
+// Log why stocks are excluded for debugging
+function exclusionReason(s) {
+  if(EXCL_SECTORS.has(s.sector)) return `Sector: ${s.sector}`;
+  if(EXCL_INDUSTRIES.has(s.industry)) return `Industry: ${s.industry}`;
+  if(SKIP_SYM.has(s.symbol)) return 'Known ETF/fund';
+  if(SKIP_NAME.test(s.name||'')) return 'Name matches ETF/leveraged pattern';
+  return null;
+}
 
 function isRealStock(s) {
   if(SKIP_SYM.has(s.symbol)) return false;
@@ -325,6 +334,15 @@ function isRealStock(s) {
   if(s.sector && EXCL_SECTORS.has(s.sector)) return false;
   if(s.industry && EXCL_INDUSTRIES.has(s.industry)) return false;
   return true;
+}
+function filterWithLog(stocks) {
+  return stocks.filter(s => {
+    if(SKIP_SYM.has(s.symbol))         { lg(`SKIP ${s.symbol} — known ETF/fund`, 'data'); return false; }
+    if(SKIP_NAME.test(s.name||''))      { lg(`SKIP ${s.symbol} — name: ${s.name}`, 'data'); return false; }
+    if(EXCL_SECTORS.has(s.sector))      { lg(`SKIP ${s.symbol} — sector: ${s.sector}`, 'data'); return false; }
+    if(EXCL_INDUSTRIES.has(s.industry)) { lg(`SKIP ${s.symbol} — industry: ${s.industry}`, 'data'); return false; }
+    return true;
+  });
 }
 
 // ── SCORING ────────────────────────────────────────────────────
@@ -426,6 +444,8 @@ async function fetchActives() {
     volume: parseInt(s.volume||0),
     mktCap: parseFloat(s.marketCap||s.mktCap||0),
   })).filter(s=>s.symbol&&s.price>0);
+  const sample = list[0];
+  lg(`Sample ${sample?.symbol}: price=${sample?.price} pct=${sample?.pct} vol=${sample?.volume} mktCap=${sample?.mktCap}`, 'data');
   lg(`Parsed ${list.length} stocks`, 'data', 'ok');
   return list;
 }
@@ -557,7 +577,7 @@ function renderCards(picks) {
       ${sigsHtml}
       ${newsHtml}
       <div class="stats-row">
-        <div class="stat"><div class="sv">${fV(s.volume)}</div><div class="sl">Vol Today</div></div>
+        <div class="stat"><div class="sv">${fV(s.volume)||"—"}</div><div class="sl">Vol Today</div></div>
         <div class="stat"><div class="sv">${fV(s.volAvg)}</div><div class="sl">Avg Vol</div></div>
         <div class="stat"><div class="sv">${fC(s.mktCap)}</div><div class="sl">Mkt Cap</div></div>
         <div class="stat"><div class="sv">${s.beta?f1(s.beta):'—'}</div><div class="sl">Beta</div></div>
@@ -610,7 +630,7 @@ async function runScan() {
     stepState('s2','done'); prog(50);
 
     // Enrich and apply sector filter
-    const enriched = preCandidates.slice(0,20).map(s => {
+    const enrichedRaw = preCandidates.slice(0,20).map(s => {
       const p = profiles[s.symbol]||{};
       return {
         ...s,
@@ -621,7 +641,8 @@ async function runScan() {
         volAvg:   parseFloat(p.volAvg||p.averageVolume||p.avgVolume||0),
         beta:     parseFloat(p.beta||0)||null,
       };
-    }).filter(s => isRealStock(s));
+    });
+    const enriched = filterWithLog(enrichedRaw);
 
     lg(`After sector filter: ${enriched.length} stocks — ${enriched.map(s=>`${s.symbol}(${s.sector||'?'})`).join(' ')}`, 'data', enriched.length>0?'ok':'warn');
 
