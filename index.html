@@ -195,7 +195,8 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
         <select class="s-input" id="minPct">
           <option value="0">Any (show all)</option>
           <option value="1">≥ 1%</option>
-          <option value="2" selected>≥ 2%</option>
+          <option value="1" selected>≥ 1%</option>
+          <option value="2">≥ 2%</option>
           <option value="3">≥ 3%</option>
         </select>
       </div>
@@ -351,13 +352,16 @@ function scoreStock(s) {
   const signals = [];
   const pct = s.pct, vol = s.volume, avg = s.volAvg, mc = s.mktCap;
 
-  // 1. MOMENTUM 0-30pts
+  // 1. MOMENTUM 0-30pts — ideal zone is 2-8%, penalize >15%
   if(pct >= 2 && pct <= 8) {
     const pts = Math.round(12 + (pct-2)*2.5); score += Math.min(pts,30);
-    signals.push({icon:'📈', text:`Up ${f2(pct)}% — in the ideal 2–8% gap zone`});
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — squarely in the 2–8% target gap zone`});
   } else if(pct > 8 && pct <= 15) {
-    score += 18;
-    signals.push({icon:'🚀', text:`Extended move +${f2(pct)}% — momentum may continue intraday`});
+    score += 14;
+    signals.push({icon:'🚀', text:`Up ${f2(pct)}% — extended, but intraday follow-through possible`});
+  } else if(pct > 15) {
+    score += 5; // big movers are already extended — low gap probability
+    signals.push({icon:'⚠️', text:`Up ${f2(pct)}% — significantly extended, gap risk is elevated`});
   } else if(pct > 0) {
     score += 8;
     signals.push({icon:'📈', text:`Up ${f2(pct)}% — building early momentum`});
@@ -450,6 +454,34 @@ async function fetchActives() {
   return list;
 }
 
+// Fetch real-time volume for a list of symbols via /stable/quote
+async function enrichVolume(stocks) {
+  const syms = stocks.map(s=>s.symbol).join(',');
+  try {
+    const r = await fetch(`https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const arr = Array.isArray(data)?data:[data];
+    const map = {};
+    arr.forEach(q=>{ if(q?.symbol) map[q.symbol]=q; });
+    lg(`Volume data loaded for: ${Object.keys(map).join(' ')}`, 'data', 'ok');
+    return stocks.map(s => {
+      const q = map[s.symbol];
+      if(!q) return s;
+      return {
+        ...s,
+        volume: parseInt(q.volume||q.tradingVolume||s.volume||0),
+        price:  parseFloat(q.price||s.price),
+        pct:    parseFloat(q.changesPercentage??q.changePercentage??s.pct),
+        mktCap: parseFloat(q.marketCap||q.mktCap||s.mktCap||0),
+      };
+    });
+  } catch(e) {
+    lg(`Volume fetch failed: ${e.message}`, 'data', 'warn');
+    return stocks;
+  }
+}
+
 // ── FETCH PROFILES ─────────────────────────────────────────────
 // Tries multiple FMP endpoint formats until one returns data
 async function fetchProfiles(symbols) {
@@ -515,15 +547,20 @@ async function fetchProfiles(symbols) {
 async function fetchNews(symbol, name, apiKey) {
   if(!apiKey) return [];
   try {
-    // Use GNews API — works from browsers without CORS issues (free tier: 100 req/day)
     const q = encodeURIComponent(`${symbol} stock`);
     const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=3&sortby=publishedAt&token=${apiKey}`;
     const r = await fetch(url);
-    if(!r.ok) return [];
+    if(!r.ok) { lg(`GNews ${symbol} HTTP ${r.status}`, 'news', 'warn'); return []; }
     const d = await r.json();
-    if(d.errors) return [];
-    return (d.articles||[]).slice(0,2).map(a=>a.title).filter(Boolean);
-  } catch(e) { return []; }
+    if(d.errors || d.error) { lg(`GNews error for ${symbol}: ${JSON.stringify(d.errors||d.error)}`, 'news', 'warn'); return []; }
+    const titles = (d.articles||[]).slice(0,2).map(a=>a.title).filter(Boolean);
+    if(titles.length) lg(`${symbol} news: ${titles[0].slice(0,60)}…`, 'news', 'ok');
+    else lg(`${symbol}: no articles found`, 'news', 'warn');
+    return titles;
+  } catch(e) {
+    lg(`GNews fetch error ${symbol}: ${e.message}`, 'news', 'warn');
+    return [];
+  }
 }
 
 // ── RENDER CARDS ───────────────────────────────────────────────
@@ -614,13 +651,17 @@ async function runScan() {
     stepState('s1','done'); prog(22);
 
     // Quick pre-filter by symbol/name before profile fetch
+    // Cast wider net — include all non-ETF stocks regardless of % move
+    // Sector filter will narrow this down after profiles load
     const preCandidates = allStocks.filter(s =>
       !SKIP_SYM.has(s.symbol) &&
       !SKIP_NAME.test(s.name||'') &&
-      s.price >= minPrice &&
-      s.pct >= minPct
-    );
-    lg(`Pre-filter: ${preCandidates.length} candidates → ${preCandidates.map(s=>s.symbol).join(' ')}`, 'data');
+      s.price >= minPrice
+    ).slice(0, 40);
+    // Also track which ones meet the % filter for priority scoring
+    const pctFiltered = preCandidates.filter(s => s.pct >= minPct);
+    lg(`Pre-filter: ${preCandidates.length} total candidates (${pctFiltered.length} meet ≥${minPct}% threshold) → ${preCandidates.map(s=>s.symbol).join(' ')}`, 'data');
+
 
     if(preCandidates.length === 0) throw new Error(`No stocks passed pre-filter. Try lowering Min % or Min Price in settings. (${allStocks.length} stocks total, top mover: ${allStocks[0]?.symbol} ${f2(allStocks[0]?.pct)}%)`);
 
@@ -650,9 +691,13 @@ async function runScan() {
     const toScore = enriched.length > 0 ? enriched : preCandidates.slice(0,15).map(s=>({...s,sector:'',industry:'',volAvg:0,beta:null}));
     if(enriched.length === 0) lg('No sector data — skipping sector filter, scoring by momentum + volume', 'data', 'warn');
 
+    // Enrich volume data from /stable/quote
+    lg('Fetching real-time volume + price data…', 'data');
+    const toScoreRaw = toScore.length > 0 ? await enrichVolume(toScore) : toScore;
+
     // STEP 3 — score and rank
     stepState('s3','active'); status('Scoring candidates…',true); prog(63);
-    const scored = toScore.map(s => {
+    const scored = toScoreRaw.map(s => {
       const {score,signals} = scoreStock(s);
       return {...s, score, signals, thesis: buildThesis(s)};
     }).sort((a,b)=>b.score-a.score);
