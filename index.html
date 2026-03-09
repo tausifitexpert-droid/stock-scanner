@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>APEX · Gap Intelligence</title>
+<title>APEX · Gap Intelligence · v0309-1905</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
@@ -352,19 +352,23 @@ function scoreStock(s) {
   const signals = [];
   const pct = s.pct, vol = s.volume, avg = s.volAvg, mc = s.mktCap;
 
-  // 1. MOMENTUM 0-30pts — ideal zone is 2-8%, penalize >15%
-  if(pct >= 2 && pct <= 8) {
+  // 1. MOMENTUM 0-30pts — only positive movers qualify for gap plays
+  if(pct < 0) {
+    // Negative — no momentum points, major penalty
+    score -= 10;
+    signals.push({icon:'📉', text:`Down ${f2(pct)}% today — not a gap candidate`});
+  } else if(pct >= 2 && pct <= 8) {
     const pts = Math.round(12 + (pct-2)*2.5); score += Math.min(pts,30);
     signals.push({icon:'📈', text:`Up ${f2(pct)}% — squarely in the 2–8% target gap zone`});
   } else if(pct > 8 && pct <= 15) {
     score += 14;
-    signals.push({icon:'🚀', text:`Up ${f2(pct)}% — extended, but intraday follow-through possible`});
+    signals.push({icon:'🚀', text:`Up ${f2(pct)}% — extended but follow-through possible`});
   } else if(pct > 15) {
-    score += 5; // big movers are already extended — low gap probability
-    signals.push({icon:'⚠️', text:`Up ${f2(pct)}% — significantly extended, gap risk is elevated`});
-  } else if(pct > 0) {
-    score += 8;
-    signals.push({icon:'📈', text:`Up ${f2(pct)}% — building early momentum`});
+    score += 4;
+    signals.push({icon:'⚠️', text:`Up ${f2(pct)}% — too extended, gap already happened`});
+  } else if(pct >= 0) {
+    score += 6;
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — early momentum, watch for continuation`});
   }
 
   // 2. VOLUME SPIKE 0-25pts
@@ -408,7 +412,9 @@ function scoreStock(s) {
 function buildThesis(s) {
   const parts = [];
   const pct = s.pct, vol = s.volume, avg = s.volAvg;
-  if(pct >= 2 && pct <= 8)
+  if(pct < 0)
+    parts.push(`${s.symbol} is down ${f2(Math.abs(pct))}% — showing weakness today but may present a reversal setup.`);
+  else if(pct >= 2 && pct <= 8)
     parts.push(`${s.symbol} is up ${f2(pct)}% with price action squarely in the 2–8% gap zone.`);
   else if(pct > 8)
     parts.push(`${s.symbol} has surged ${f2(pct)}% — extended but follow-through momentum may continue.`);
@@ -719,7 +725,13 @@ async function runScan() {
       return {...s, score, signals, thesis: buildThesis(s)};
     }).sort((a,b)=>b.score-a.score);
 
-    const top5 = scored.slice(0,5);
+    // Prefer positive movers — sort negatives to bottom
+    const top5 = scored.filter(s => s.pct >= 0).slice(0,5);
+    if(top5.length < 5) {
+      // If not enough positive stocks, add best negatives to fill
+      const neg = scored.filter(s => s.pct < 0);
+      while(top5.length < 5 && neg.length) top5.push(neg.shift());
+    }
     top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | +${f2(s.pct)}% | Vol ${fV(s.volume)} | ${s.sector||'sector?'}`, 'score', i===0?'ok':''));
     stepState('s3','done'); prog(75);
 
