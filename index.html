@@ -458,13 +458,31 @@ async function fetchActives() {
 async function enrichVolume(stocks) {
   const syms = stocks.map(s=>s.symbol).join(',');
   try {
-    const r = await fetch(`https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`);
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    const arr = Array.isArray(data)?data:[data];
+    // Try multiple FMP quote endpoint variants
+    let data = null;
+    const quoteUrls = [
+      `https://financialmodelingprep.com/stable/quote?symbols=${syms}&apikey=${FMP}`,
+      `https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`,
+    ];
+    for(const url of quoteUrls) {
+      try {
+        const r = await fetch(url);
+        if(!r.ok) continue;
+        const d = await r.json();
+        const arr = Array.isArray(d)?d:(d?.symbol?[d]:[]);
+        if(arr.length > 0) { data = arr; break; }
+      } catch(e) {}
+    }
+    if(!data) throw new Error('All quote endpoints returned empty');
+    const arr = data;
     const map = {};
     arr.forEach(q=>{ if(q?.symbol) map[q.symbol]=q; });
-    lg(`Volume data loaded for: ${Object.keys(map).join(' ')}`, 'data', 'ok');
+    if(Object.keys(map).length === 0) {
+      lg('Quote returned 0 results — volume will show as —', 'data', 'warn');
+    } else {
+      const s0 = Object.values(map)[0];
+      lg(`Quote sample ${s0.symbol}: vol=${s0.volume} price=${s0.price} pct=${s0.changesPercentage}`, 'data', 'ok');
+    }
     return stocks.map(s => {
       const q = map[s.symbol];
       if(!q) return s;
@@ -544,21 +562,20 @@ async function fetchProfiles(symbols) {
 }
 
 // ── FETCH NEWS ─────────────────────────────────────────────────
-async function fetchNews(symbol, name, apiKey) {
-  if(!apiKey) return [];
+// Uses FMP stock news endpoint — same API key, no CORS issues
+async function fetchNews(symbol) {
   try {
-    const q = encodeURIComponent(`${symbol} stock`);
-    const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=3&sortby=publishedAt&token=${apiKey}`;
+    const url = `https://financialmodelingprep.com/stable/news/stock?symbols=${symbol}&limit=3&apikey=${FMP}`;
     const r = await fetch(url);
-    if(!r.ok) { lg(`GNews ${symbol} HTTP ${r.status}`, 'news', 'warn'); return []; }
+    if(!r.ok) { lg(`News ${symbol} HTTP ${r.status}`, 'news', 'warn'); return []; }
     const d = await r.json();
-    if(d.errors || d.error) { lg(`GNews error for ${symbol}: ${JSON.stringify(d.errors||d.error)}`, 'news', 'warn'); return []; }
-    const titles = (d.articles||[]).slice(0,2).map(a=>a.title).filter(Boolean);
-    if(titles.length) lg(`${symbol} news: ${titles[0].slice(0,60)}…`, 'news', 'ok');
-    else lg(`${symbol}: no articles found`, 'news', 'warn');
+    const articles = Array.isArray(d) ? d : [];
+    const titles = articles.slice(0,2).map(a => a.title||a.headline||'').filter(Boolean);
+    if(titles.length) lg(`${symbol}: ${titles[0].slice(0,65)}…`, 'news', 'ok');
+    else lg(`${symbol}: no news found`, 'news', 'warn');
     return titles;
   } catch(e) {
-    lg(`GNews fetch error ${symbol}: ${e.message}`, 'news', 'warn');
+    lg(`News error ${symbol}: ${e.message}`, 'news', 'warn');
     return [];
   }
 }
@@ -640,7 +657,7 @@ async function runScan() {
   lg('─────────────────────────────');
   lg(`Scan · ${new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York'})} EST`);
 
-  const newsKey  = document.getElementById('newsKey').value.trim() || '9face43af44b9f7a5a35a13d48c6a42c';
+
   const minPct   = parseFloat(document.getElementById('minPct').value)||0;
   const minPrice = parseFloat(document.getElementById('minPrice').value)||1;
 
@@ -706,19 +723,13 @@ async function runScan() {
     top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | +${f2(s.pct)}% | Vol ${fV(s.volume)} | ${s.sector||'sector?'}`, 'score', i===0?'ok':''));
     stepState('s3','done'); prog(75);
 
-    // STEP 4 — news
+    // STEP 4 — news via FMP (no extra key needed)
     stepState('s4','active'); prog(82);
-    if(newsKey) {
-      status('Fetching live headlines…',true);
-      lg(`Fetching news for ${top5.map(s=>s.symbol).join(', ')}`, 'news');
-      for(const s of top5) {
-        s.headlines = await fetchNews(s.symbol, s.name, newsKey);
-        if(s.headlines.length) lg(`${s.symbol}: ${s.headlines[0].slice(0,70)}…`, 'news', 'ok');
-        await new Promise(r=>setTimeout(r,250));
-      }
-    } else {
-      lg('No NewsAPI key — headlines skipped (add key in settings)', 'news', 'warn');
-      top5.forEach(s=>s.headlines=[]);
+    status('Fetching live news headlines…',true);
+    lg(`Fetching news for: ${top5.map(s=>s.symbol).join(', ')}`, 'news');
+    for(const s of top5) {
+      s.headlines = await fetchNews(s.symbol);
+      await new Promise(r=>setTimeout(r,200));
     }
     stepState('s4','done'); prog(90);
 
