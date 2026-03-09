@@ -18,148 +18,146 @@
 body{background:var(--ink);color:var(--text);font-family:var(--mono);min-height:100vh;}
 body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);}
 
-/* HEADER */
 .top-bar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:52px;border-bottom:1px solid var(--wire);background:rgba(8,11,14,0.97);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
 .wordmark{font-family:var(--serif);font-size:20px;letter-spacing:.04em;color:var(--amber2);display:flex;align-items:baseline;gap:10px;}
-.wordmark-sub{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--dim);font-weight:400;}
+.wordmark-sub{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--dim);}
 .top-right{display:flex;align-items:center;gap:20px;}
-#live-clock{font-size:11px;color:var(--mid);letter-spacing:.06em;}
+#live-clock{font-size:11px;color:var(--mid);}
 .mkt-pill{font-size:8px;font-weight:600;letter-spacing:.14em;padding:3px 10px;border-radius:2px;text-transform:uppercase;}
 .mkt-open{background:rgba(32,201,122,.12);color:var(--emerald);border:1px solid rgba(32,201,122,.22);}
 .mkt-closed{background:rgba(240,80,96,.10);color:var(--rose);border:1px solid rgba(240,80,96,.18);}
 .mkt-pre{background:rgba(232,160,32,.10);color:var(--amber);border:1px solid rgba(232,160,32,.20);}
 
-/* STAGE */
-.stage{max-width:1100px;margin:0 auto;padding:48px 28px 80px;}
+.stage{max-width:1100px;margin:0 auto;padding:40px 28px 80px;}
 
-/* COMMAND */
-.command{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:start;margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--wire);}
-.command-eyebrow{font-size:9px;letter-spacing:.22em;color:var(--amber);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.command-eyebrow::before{content:'';display:inline-block;width:24px;height:1px;background:var(--amber);}
-.command-h1{font-family:var(--serif);font-size:clamp(24px,3.2vw,42px);line-height:1.12;color:var(--text);margin-bottom:14px;}
-.command-h1 em{font-style:italic;color:var(--amber2);}
-.command-desc{font-size:11px;color:var(--mid);line-height:1.85;max-width:480px;}
-.command-desc strong{color:var(--pale);}
+/* HERO */
+.hero{display:grid;grid-template-columns:1fr 280px;gap:32px;margin-bottom:40px;padding-bottom:36px;border-bottom:1px solid var(--wire);}
+.hero-eyebrow{font-size:9px;letter-spacing:.22em;color:var(--amber);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--amber);}
+.hero-h1{font-family:var(--serif);font-size:clamp(22px,2.8vw,38px);line-height:1.12;margin-bottom:10px;}
+.hero-h1 em{font-style:italic;color:var(--amber2);}
+.hero-desc{font-size:11px;color:var(--mid);line-height:1.85;max-width:480px;}
 
-/* SETTINGS PANEL */
-.settings{background:var(--ink2);border:1px solid var(--wire);padding:20px;margin-top:20px;max-width:480px;}
-.settings-title{font-size:8px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:14px;}
-.setting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.setting-label{font-size:10px;color:var(--mid);}
-.setting-input{background:var(--ink3);border:1px solid var(--wire2);color:var(--pale);font-family:var(--mono);font-size:10px;padding:4px 8px;width:120px;outline:none;}
-.setting-input:focus{border-color:var(--amber);}
-.setting-hint{font-size:8px;color:var(--dim);margin-top:4px;line-height:1.5;}
-.news-api-link{color:var(--amber);text-decoration:none;}
-.news-api-link:hover{text-decoration:underline;}
+/* SETTINGS */
+.settings-panel{background:var(--ink2);border:1px solid var(--wire);padding:18px 20px;}
+.s-title{font-size:8px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--wire);}
+.s-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.s-label{font-size:9px;color:var(--mid);letter-spacing:.06em;}
+.s-input{background:var(--ink3);border:1px solid var(--wire2);color:var(--pale);font-family:var(--mono);font-size:10px;padding:6px 8px;width:100%;outline:none;transition:border .2s;}
+.s-input:focus{border-color:var(--amber);}
+.s-hint{font-size:8px;color:var(--dim);line-height:1.5;}
+.s-hint a{color:var(--amber);text-decoration:none;}
+.s-hint a:hover{text-decoration:underline;}
+.s-divider{height:1px;background:var(--wire);margin:12px 0;}
 
 /* SCAN BUTTON */
-.scan-wrap{padding-top:4px;}
-.scan-btn{background:transparent;border:1px solid var(--amber);color:var(--amber2);font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:16px 32px;cursor:pointer;transition:all .25s;position:relative;display:block;width:160px;margin-bottom:20px;overflow:hidden;}
+.scan-btn{width:100%;background:transparent;border:1px solid var(--amber);color:var(--amber2);font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:13px 20px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;margin-top:14px;}
 .scan-btn::before{content:'';position:absolute;inset:0;background:var(--amber);transform:scaleX(0);transform-origin:left;transition:transform .25s;z-index:-1;}
 .scan-btn:hover{color:#000;}.scan-btn:hover::before{transform:scaleX(1);}
-.scan-btn:disabled{opacity:.35;cursor:not-allowed;}
-.scan-btn-icon{display:block;font-size:16px;margin-bottom:8px;}
-.run-status-text{font-size:10px;color:var(--mid);letter-spacing:.06em;min-height:16px;transition:color .3s;margin-bottom:8px;}
-.run-status-text.live{color:var(--amber2);}
-.prog-track{width:160px;height:1px;background:var(--wire2);overflow:hidden;}
-.prog-fill{height:100%;background:var(--amber);width:0%;transition:width .5s ease;box-shadow:0 0 8px rgba(232,160,32,.6);}
+.scan-btn:disabled{opacity:.4;cursor:not-allowed;}
+.s-status{font-size:9px;color:var(--mid);margin-top:8px;min-height:14px;text-align:center;transition:color .3s;}
+.s-status.live{color:var(--amber2);}
+.prog-track{height:1px;background:var(--wire2);margin-top:8px;overflow:hidden;}
+.prog-fill{height:100%;background:var(--amber);width:0%;transition:width .5s;box-shadow:0 0 6px rgba(232,160,32,.6);}
 
 /* STEPS */
-.steps{margin-top:18px;display:flex;flex-direction:column;gap:7px;}
-.step{display:flex;align-items:center;gap:10px;font-size:9px;letter-spacing:.1em;color:var(--dim);transition:color .3s;}
+.steps{margin-top:14px;display:flex;flex-direction:column;gap:6px;}
+.step{display:flex;align-items:center;gap:8px;font-size:8px;letter-spacing:.1em;color:var(--dim);transition:color .3s;}
 .step.active{color:var(--amber2);}.step.done{color:var(--emerald);}
-.step-dot{width:5px;height:5px;border-radius:50%;border:1px solid currentColor;flex-shrink:0;}
-.step-pulse{display:none;width:5px;height:5px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;flex-shrink:0;}
+.step-dot{width:4px;height:4px;border-radius:50%;border:1px solid currentColor;flex-shrink:0;}
+.step-pulse{display:none;width:4px;height:4px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;flex-shrink:0;}
 .step.active .step-dot{display:none;}.step.active .step-pulse{display:block;}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.5);}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.6);}}
 
 /* ERROR */
-.err-panel{background:rgba(240,80,96,.07);border:1px solid rgba(240,80,96,.18);border-radius:2px;padding:18px 22px;margin-bottom:32px;display:none;}
-.err-label{font-size:9px;letter-spacing:.16em;color:var(--rose);text-transform:uppercase;margin-bottom:8px;}
+.err-panel{background:rgba(240,80,96,.07);border:1px solid rgba(240,80,96,.18);padding:16px 20px;margin-bottom:24px;display:none;}
+.err-label{font-size:8px;letter-spacing:.16em;color:var(--rose);text-transform:uppercase;margin-bottom:6px;}
 .err-msg{font-size:11px;color:var(--pale);line-height:1.7;}
 
 /* RESULTS */
 #results{display:none;}
-.results-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;padding-bottom:14px;border-bottom:1px solid var(--wire);}
-.results-h{font-family:var(--serif);font-size:22px;color:var(--text);}
-.results-meta{font-size:9px;color:var(--dim);letter-spacing:.1em;}
+.r-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--wire);}
+.r-title{font-family:var(--serif);font-size:20px;}
+.r-meta{font-size:9px;color:var(--dim);}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1px;background:var(--wire);border:1px solid var(--wire);}
 
-/* CARDS GRID */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1px;background:var(--wire);border:1px solid var(--wire);}
-.card{background:var(--ink2);padding:24px;position:relative;transition:background .2s;animation:fadeUp .5s ease both;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-.card:nth-child(1){animation-delay:.05s;}.card:nth-child(2){animation-delay:.12s;}.card:nth-child(3){animation-delay:.19s;}.card:nth-child(4){animation-delay:.26s;}.card:nth-child(5){animation-delay:.33s;}
+/* CARD */
+.card{background:var(--ink2);padding:22px;position:relative;transition:background .2s;animation:fadeUp .4s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.card:nth-child(1){animation-delay:.05s;}.card:nth-child(2){animation-delay:.1s;}.card:nth-child(3){animation-delay:.15s;}.card:nth-child(4){animation-delay:.2s;}.card:nth-child(5){animation-delay:.25s;}
 .card:hover{background:var(--ink3);}
-.card-num{position:absolute;top:18px;right:18px;font-family:var(--serif);font-size:34px;color:rgba(255,255,255,.03);line-height:1;pointer-events:none;}
+.card-num{position:absolute;top:16px;right:16px;font-family:var(--serif);font-size:32px;color:rgba(255,255,255,.03);line-height:1;pointer-events:none;}
+.c-ticker{font-family:var(--serif);font-size:24px;color:var(--text);line-height:1;margin-bottom:2px;}
+.c-name{font-size:9px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;margin-bottom:10px;}
+.c-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;}
+.tag{font-size:7px;letter-spacing:.14em;padding:2px 6px;text-transform:uppercase;font-weight:600;}
+.tag-sector{background:rgba(64,200,224,.1);color:var(--ice);border:1px solid rgba(64,200,224,.18);}
+.tag-a{background:rgba(32,201,122,.12);color:var(--emerald);border:1px solid rgba(32,201,122,.22);}
+.tag-b{background:rgba(232,160,32,.10);color:var(--amber);border:1px solid rgba(232,160,32,.20);}
+.tag-c{background:rgba(240,80,96,.09);color:var(--rose);border:1px solid rgba(240,80,96,.16);}
 
-/* CARD CONTENT */
-.card-ticker{font-family:var(--serif);font-size:26px;color:var(--text);line-height:1;margin-bottom:2px;}
-.card-company{font-size:9px;color:var(--mid);letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;margin-bottom:12px;}
-.card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;}
-.tag{font-size:7px;letter-spacing:.14em;padding:2px 7px;text-transform:uppercase;font-weight:600;border-radius:1px;}
-.tag-sector{background:rgba(64,200,224,.10);color:var(--ice);border:1px solid rgba(64,200,224,.18);}
-.tag-score-a{background:rgba(32,201,122,.12);color:var(--emerald);border:1px solid rgba(32,201,122,.22);}
-.tag-score-b{background:rgba(232,160,32,.10);color:var(--amber);border:1px solid rgba(232,160,32,.20);}
-.tag-score-c{background:rgba(240,80,96,.09);color:var(--rose);border:1px solid rgba(240,80,96,.16);}
+/* PRICE ROW */
+.price-row{display:flex;align-items:center;background:var(--ink3);border:1px solid var(--wire);padding:9px 12px;margin-bottom:12px;gap:12px;}
+.pr-price{font-size:17px;font-weight:500;}
+.pr-chg{font-size:11px;font-weight:500;}
+.pr-chg.up{color:var(--emerald);}.pr-chg.dn{color:var(--rose);}.pr-chg.flat{color:var(--mid);}
+.pr-right{margin-left:auto;text-align:right;}
+.pr-tgt-lbl{font-size:7px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+.pr-tgt-val{font-size:12px;color:var(--amber2);font-weight:500;margin-top:1px;}
 
-/* PRICE BAR */
-.price-bar{display:flex;align-items:center;gap:16px;background:var(--ink3);border:1px solid var(--wire);padding:10px 14px;margin-bottom:14px;}
-.pb-price{font-size:18px;font-weight:500;color:var(--text);}
-.pb-change{font-size:11px;font-weight:500;}
-.pb-change.up{color:var(--emerald);}.pb-change.dn{color:var(--rose);}.pb-change.flat{color:var(--mid);}
-.pb-right{margin-left:auto;text-align:right;}
-.pb-target-lbl{font-size:7px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;}
-.pb-target-val{font-size:13px;color:var(--amber2);font-weight:500;margin-top:1px;}
+/* THESIS */
+.thesis{font-size:11px;color:var(--pale);line-height:1.75;margin-bottom:10px;}
 
-/* THESIS / REASONS */
-.thesis{font-size:11px;color:var(--pale);line-height:1.75;margin-bottom:12px;}
-.reasons-lbl{font-size:7px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:8px;}
-.reason-item{display:flex;gap:8px;align-items:flex-start;font-size:10px;color:var(--mid);line-height:1.6;padding:4px 0;border-bottom:1px solid var(--wire);}
-.reason-item:last-child{border:none;}
-.reason-icon{flex-shrink:0;}
+/* SIGNALS */
+.sig-lbl{font-size:7px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-bottom:6px;}
+.sig-item{display:flex;gap:7px;align-items:flex-start;font-size:10px;color:var(--mid);line-height:1.55;padding:3px 0;border-bottom:1px solid var(--wire);}
+.sig-item:last-child{border:none;}
+.sig-icon{flex-shrink:0;}
+
+/* NEWS */
+.news-block{margin-top:8px;padding:8px 10px;background:rgba(64,200,224,.04);border:1px solid rgba(64,200,224,.10);}
+.news-lbl{font-size:7px;letter-spacing:.14em;color:rgba(64,200,224,.5);text-transform:uppercase;margin-bottom:4px;}
+.news-item{font-size:9px;color:rgba(64,200,224,.75);line-height:1.6;padding:2px 0;}
+.news-item::before{content:'→ ';}
 
 /* SCORE BAR */
-.score-row{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--wire);}
-.score-lbl{font-size:8px;color:var(--dim);letter-spacing:.1em;flex-shrink:0;}
+.score-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--wire);}
+.score-lbl{font-size:7px;color:var(--dim);letter-spacing:.1em;flex-shrink:0;}
 .score-track{flex:1;height:2px;background:var(--wire2);}
-.score-fill{height:100%;transition:width 1.2s ease .4s;}
-.score-fill.a{background:var(--emerald);}.score-fill.b{background:var(--amber);}.score-fill.c{background:var(--rose);}
-.score-val{font-size:9px;color:var(--pale);flex-shrink:0;}
+.score-fill{height:100%;transition:width 1.2s ease .3s;}
+.sf-a{background:var(--emerald);}.sf-b{background:var(--amber);}.sf-c{background:var(--rose);}
+.score-val{font-size:8px;color:var(--pale);flex-shrink:0;}
 
 /* STATS */
-.stats-row{display:flex;gap:18px;margin-top:12px;}
+.stats-row{display:flex;gap:14px;margin-top:10px;}
 .stat{text-align:center;}
-.stat-val{font-size:11px;font-weight:500;color:var(--pale);}
-.stat-lbl{font-size:7px;letter-spacing:.12em;color:var(--dim);margin-top:1px;}
-
-/* NEWS STRIP */
-.news-strip{margin-top:10px;padding:8px 10px;background:rgba(64,200,224,.05);border:1px solid rgba(64,200,224,.12);font-size:9px;color:var(--ice);line-height:1.6;}
-.news-strip-lbl{font-size:7px;letter-spacing:.14em;color:rgba(64,200,224,.5);margin-bottom:3px;}
+.sv{font-size:10px;font-weight:500;color:var(--pale);}
+.sl{font-size:7px;letter-spacing:.1em;color:var(--dim);margin-top:1px;}
 
 /* LOG */
-#log-wrap{margin-top:48px;border:1px solid var(--wire);}
-.log-top{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--wire);cursor:pointer;user-select:none;}
-.log-label{font-size:8px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;}
-.log-count{font-size:8px;color:var(--dim);}
-.log-btn{font-size:8px;color:var(--dim);letter-spacing:.1em;}
-#log-entries{max-height:240px;overflow-y:auto;padding:8px 16px;scrollbar-width:thin;scrollbar-color:var(--ink3) transparent;}
-.log-row{display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.025);font-size:9px;line-height:1.6;}
-.log-t{color:var(--dim);flex-shrink:0;}
-.log-ph{flex-shrink:0;font-size:7px;letter-spacing:.1em;padding:1px 5px;text-transform:uppercase;}
-.ph-data{background:rgba(64,200,224,.08);color:var(--ice);}
-.ph-score{background:rgba(152,120,240,.10);color:var(--violet);}
-.ph-news{background:rgba(232,160,32,.08);color:var(--amber);}
-.ph-ok{background:rgba(32,201,122,.08);color:var(--emerald);}
-.ph-err{background:rgba(240,80,96,.08);color:var(--rose);}
-.log-m{color:var(--mid);flex:1;}
-.log-m.ok{color:var(--emerald);}.log-m.warn{color:var(--amber2);}.log-m.err{color:var(--rose);}
+#log-wrap{margin-top:40px;border:1px solid var(--wire);}
+.log-top{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--wire);cursor:pointer;user-select:none;}
+.log-lbl{font-size:8px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;}
+.log-cnt{font-size:8px;color:var(--dim);}
+.log-btn{font-size:8px;color:var(--dim);}
+#log-body{max-height:220px;overflow-y:auto;padding:6px 14px;scrollbar-width:thin;scrollbar-color:var(--ink3) transparent;}
+.lr{display:flex;gap:8px;align-items:baseline;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);font-size:9px;line-height:1.55;}
+.lt{color:var(--dim);flex-shrink:0;font-size:8px;}
+.lp{flex-shrink:0;font-size:7px;letter-spacing:.08em;padding:1px 4px;text-transform:uppercase;}
+.lp.data{background:rgba(64,200,224,.08);color:var(--ice);}
+.lp.score{background:rgba(152,120,240,.10);color:var(--violet);}
+.lp.news{background:rgba(232,160,32,.08);color:var(--amber);}
+.lp.ok{background:rgba(32,201,122,.08);color:var(--emerald);}
+.lp.err{background:rgba(240,80,96,.08);color:var(--rose);}
+.lm{color:var(--mid);flex:1;}
+.lm.ok{color:var(--emerald);}.lm.warn{color:var(--amber2);}.lm.err{color:var(--rose);}
 
-.foot{text-align:center;font-size:8px;color:var(--dim);letter-spacing:.14em;padding:28px;border-top:1px solid var(--wire);margin-top:64px;text-transform:uppercase;}
-
-@media(max-width:640px){.command{grid-template-columns:1fr;}.cards{grid-template-columns:1fr;}}
+.foot{text-align:center;font-size:8px;color:var(--dim);letter-spacing:.14em;padding:24px;border-top:1px solid var(--wire);margin-top:56px;text-transform:uppercase;}
+@media(max-width:640px){.hero{grid-template-columns:1fr;}.cards{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
+
 <header class="top-bar">
   <div class="wordmark">Apex <span class="wordmark-sub">Gap Intelligence</span></div>
   <div class="top-right">
@@ -169,59 +167,58 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
 </header>
 
 <div class="stage">
-  <div class="command">
-    <div class="command-copy">
-      <div class="command-eyebrow">AI-Powered Gap Screener</div>
-      <h1 class="command-h1">Top 5 stocks poised<br>to gain <em>2–8% today</em></h1>
-      <p class="command-desc">
-        Scans the most-active universe, pulls <strong>live news headlines</strong>,
-        scores each stock on momentum, volume spike, market cap, sector strength,
-        and news sentiment — then surfaces the 5 with the strongest gap setup.
-        <br><br>
-        Optionally add a free <a class="news-api-link" href="https://newsapi.org/register" target="_blank">NewsAPI key</a>
-        (100 free calls/day) for live headlines on each pick.
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">Real-Time Gap Screener</div>
+      <h1 class="hero-h1">Top 5 stocks poised<br>to gain <em>2–8% today</em></h1>
+      <p class="hero-desc">
+        Scans most-active US stocks, pulls live company data and news headlines,
+        filters out ETFs, leveraged funds, healthcare and financial stocks —
+        then scores remaining candidates on momentum, volume spike, market cap,
+        beta, sector and news sentiment to surface the best gap setups.
       </p>
-      <div class="settings">
-        <div class="settings-title">⚙ Settings</div>
-        <div class="setting-row">
-          <span class="setting-label">NewsAPI Key (optional)</span>
-          <input class="setting-input" id="newsKey" placeholder="paste key here" />
-        </div>
-        <div class="setting-hint">Free at newsapi.org · adds live headlines to each pick</div>
-        <div class="setting-row" style="margin-top:12px;">
-          <span class="setting-label">Min Market Cap</span>
-          <select class="setting-input" id="minMktCap">
-            <option value="0">Any</option>
-            <option value="1e9" selected>$1B+</option>
-            <option value="10e9">$10B+</option>
-            <option value="50e9">$50B+</option>
-          </select>
-        </div>
-        <div class="setting-row">
-          <span class="setting-label">Min % Move Today</span>
-          <select class="setting-input" id="minPct">
-            <option value="0">Any</option>
-            <option value="1">1%+</option>
-            <option value="2" selected>2%+</option>
-            <option value="3">3%+</option>
-          </select>
-        </div>
-      </div>
     </div>
 
-    <div class="scan-wrap">
-      <button class="scan-btn" id="scan-btn" onclick="runScan()">
-        <span class="scan-btn-icon">◈</span>
-        Scan Now
-      </button>
-      <div class="run-status-text" id="status-text">Ready</div>
+    <div class="settings-panel">
+      <div class="s-title">⚙ Configuration</div>
+
+      <div class="s-row">
+        <div class="s-label">NewsAPI Key <span style="color:var(--dim)">(optional)</span></div>
+        <input class="s-input" id="newsKey" placeholder="sk-… paste key here" value="9face43af44b9f7a5a35a13d48c6a42c" />
+        <div class="s-hint">Free 100 calls/day at <a href="https://gnews.io/register" target="_blank">gnews.io</a> — works from GitHub Pages</div>
+      </div>
+
+      <div class="s-divider"></div>
+
+      <div class="s-row">
+        <div class="s-label">Min % move today</div>
+        <select class="s-input" id="minPct">
+          <option value="0">Any (show all)</option>
+          <option value="1">≥ 1%</option>
+          <option value="2" selected>≥ 2%</option>
+          <option value="3">≥ 3%</option>
+        </select>
+      </div>
+
+      <div class="s-row">
+        <div class="s-label">Min price</div>
+        <select class="s-input" id="minPrice">
+          <option value="1">$1+</option>
+          <option value="5" selected>$5+</option>
+          <option value="10">$10+</option>
+        </select>
+      </div>
+
+      <button class="scan-btn" id="scan-btn" onclick="runScan()">◈ &nbsp;Run Scan</button>
+      <div class="s-status" id="status-text">Ready</div>
       <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
+
       <div class="steps">
-        <div class="step" id="s1"><div class="step-dot"></div><div class="step-pulse"></div> Fetch actives</div>
-        <div class="step" id="s2"><div class="step-dot"></div><div class="step-pulse"></div> Load profiles</div>
-        <div class="step" id="s3"><div class="step-dot"></div><div class="step-pulse"></div> Score & rank</div>
-        <div class="step" id="s4"><div class="step-dot"></div><div class="step-pulse"></div> Fetch news</div>
-        <div class="step" id="s5"><div class="step-dot"></div><div class="step-pulse"></div> Build report</div>
+        <div class="step" id="s1"><div class="step-dot"></div><div class="step-pulse"></div>Fetch most-actives</div>
+        <div class="step" id="s2"><div class="step-dot"></div><div class="step-pulse"></div>Load profiles + filter</div>
+        <div class="step" id="s3"><div class="step-dot"></div><div class="step-pulse"></div>Score &amp; rank</div>
+        <div class="step" id="s4"><div class="step-dot"></div><div class="step-pulse"></div>Fetch live news</div>
+        <div class="step" id="s5"><div class="step-dot"></div><div class="step-pulse"></div>Build report</div>
       </div>
     </div>
   </div>
@@ -232,389 +229,446 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
   </div>
 
   <div id="results">
-    <div class="results-header">
-      <div class="results-h">Today's Top Gap Candidates</div>
-      <div class="results-meta" id="results-meta"></div>
+    <div class="r-header">
+      <div class="r-title">Today's Top Gap Candidates</div>
+      <div class="r-meta" id="r-meta"></div>
     </div>
     <div class="cards" id="cards"></div>
   </div>
 
   <div id="log-wrap" style="display:none">
     <div class="log-top" onclick="toggleLog()">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="log-label">Execution log</span>
-        <span class="log-count" id="log-count"></span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="log-lbl">Execution log</span>
+        <span class="log-cnt" id="log-cnt"></span>
       </div>
       <span class="log-btn" id="log-btn">▲ collapse</span>
     </div>
-    <div id="log-entries"></div>
+    <div id="log-body"></div>
   </div>
 </div>
 
-<div class="foot">Apex · Not financial advice · For educational purposes only</div>
+<div class="foot">Apex · Not financial advice · Educational purposes only</div>
 
 <script>
 const FMP = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
 let logVisible = true, t0 = 0;
 
-// ── CLOCK ──────────────────────────────────────────────
+// ── CLOCK ──────────────────────────────────────────────────────
 function tick() {
   const est = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   const p = n => String(n).padStart(2,'0');
-  document.getElementById('live-clock').textContent = `${p(est.getHours())}:${p(est.getMinutes())}:${p(est.getSeconds())} EST`;
+  document.getElementById('live-clock').textContent =
+    `${p(est.getHours())}:${p(est.getMinutes())}:${p(est.getSeconds())} EST`;
   const b = document.getElementById('mkt-badge');
   const d = est.getDay(), hm = est.getHours()*60+est.getMinutes();
-  if(d===0||d===6)   { b.className='mkt-pill mkt-closed'; b.textContent='Weekend'; }
-  else if(hm<570)    { b.className='mkt-pill mkt-pre';    b.textContent='Pre-Market'; }
-  else if(hm<960)    { b.className='mkt-pill mkt-open';   b.textContent='● Live'; }
-  else               { b.className='mkt-pill mkt-closed'; b.textContent='After-Hours'; }
+  if(d===0||d===6)   {b.className='mkt-pill mkt-closed';b.textContent='Weekend';}
+  else if(hm<570)    {b.className='mkt-pill mkt-pre';b.textContent='Pre-Market';}
+  else if(hm<960)    {b.className='mkt-pill mkt-open';b.textContent='● Live';}
+  else               {b.className='mkt-pill mkt-closed';b.textContent='After-Hours';}
 }
 setInterval(tick,1000); tick();
 
-// ── LOG ────────────────────────────────────────────────
+// ── LOG ────────────────────────────────────────────────────────
 function lg(msg, phase='', type='') {
   document.getElementById('log-wrap').style.display='block';
   const now=new Date(), p=n=>String(n).padStart(2,'0');
   const ts=`${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
-  const el=document.createElement('div'); el.className='log-row';
-  const ph=phase?`<span class="log-ph ph-${phase}">${phase}</span>`:'';
-  el.innerHTML=`<span class="log-t">${ts}</span>${ph}<span class="log-m ${type}">${msg}</span>`;
-  const b=document.getElementById('log-entries'); b.appendChild(el); b.scrollTop=b.scrollHeight;
-  document.getElementById('log-count').textContent=`(${b.querySelectorAll('.log-row').length})`;
+  const el=document.createElement('div'); el.className='lr';
+  const ph=phase?`<span class="lp ${phase}">${phase}</span>`:'';
+  el.innerHTML=`<span class="lt">${ts}</span>${ph}<span class="lm ${type}">${msg}</span>`;
+  const b=document.getElementById('log-body'); b.appendChild(el); b.scrollTop=b.scrollHeight;
+  document.getElementById('log-cnt').textContent=`(${b.querySelectorAll('.lr').length})`;
 }
-function toggleLog(){logVisible=!logVisible;document.getElementById('log-entries').style.display=logVisible?'block':'none';document.getElementById('log-btn').textContent=logVisible?'▲ collapse':'▼ expand';}
+function toggleLog(){logVisible=!logVisible;document.getElementById('log-body').style.display=logVisible?'block':'none';document.getElementById('log-btn').textContent=logVisible?'▲ collapse':'▼ expand';}
 function prog(p){document.getElementById('prog').style.width=p+'%';}
-function status(msg,live=false){const e=document.getElementById('status-text');e.textContent=msg;e.className='run-status-text'+(live?' live':'');}
-function stepState(id,state){const e=document.getElementById(id);e.className='step'+(state==='active'?' active':state==='done'?' done':'');}
+function status(msg,live=false){const e=document.getElementById('status-text');e.textContent=msg;e.className='s-status'+(live?' live':'');}
+function stepState(id,s){document.getElementById(id).className='step'+(s==='active'?' active':s==='done'?' done':'');}
 
-// ── UTILS ──────────────────────────────────────────────
-const f2=v=>(!isNaN(parseFloat(v)))?parseFloat(v).toFixed(2):'—';
-const f1=v=>(!isNaN(parseFloat(v)))?parseFloat(v).toFixed(1):'—';
-function fVol(v){if(!v)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v;}
-function fCap(v){if(!v)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(1)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(0)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
+// ── UTILS ──────────────────────────────────────────────────────
+const f2=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(2);
+const f1=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(1);
+function fV(v){if(!v||v<1)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return String(v);}
+function fC(v){if(!v||v<1)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(1)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(0)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
+function sc(n){return n>=70?'a':n>=45?'b':'c';}
 
-// ── SCORING ENGINE ─────────────────────────────────────
-// Scores each stock 0–100 based on multiple signals
+// ── EXCLUDED ───────────────────────────────────────────────────
+// Symbols: ETFs, leveraged, inverse, crypto, bond, commodity funds
+const SKIP_SYM = new Set([
+  'SPY','QQQ','IWM','DIA','MDY','VTI','VOO','IVV','GLD','SLV','USO','UNG',
+  'TLT','IEF','SHY','HYG','LQD','AGG','BND','JNK',
+  'EEM','EFA','FXI','EWJ','EWZ','VWO',
+  'VXX','UVXY','SVXY','VIXY',
+  'TQQQ','SQQQ','SPXL','SPXS','UDOW','SDOW','TNA','TZA','LABU','LABD',
+  'SOXL','SOXS','FNGU','FNGD','BULZ','BERZ','WEBL','WEBS',
+  'TSLL','TSLS','TSLQ','NVDL','NVDD','NVD','TSDD','CONL','COIG','COIA',
+  'NBIG','NBIL','MSTU','MSTD','SPDN','BITO','IBIT','GBTC','ETHE',
+  'XLF','XLE','XLK','XLV','XLI','XLB','XLP','XLU','XLY','XLRE',
+  'GDX','GDXJ','SLX','KRE','KBE','IAT','IYF','IBB','XBI',
+]);
+// Name keywords for leveraged/inverse/ETF products
+const SKIP_NAME = /\b(2x|3x|ultra|short|inverse|daily|leveraged|bear|bull etf|proshares|direxion|graniteShares|wisdomtree fund|ishares|vanguard etf|spdr)\b/i;
+// Sectors to exclude
+const EXCL_SECTORS = new Set(['Healthcare','Financial Services','Real Estate','Utilities']);
+// Industries to exclude within allowed sectors (extra precision)
+const EXCL_INDUSTRIES = new Set([
+  'Biotechnology','Drug Manufacturers','Medical Devices','Medical Instruments',
+  'Diagnostics & Research','Health Information Services','Medical Distribution',
+  'Banks—Regional','Banks—Diversified','Insurance','Capital Markets',
+  'Asset Management','Insurance—Diversified','Mortgage Finance',
+  'Credit Services','Financial Conglomerates',
+]);
+
+function isRealStock(s) {
+  if(SKIP_SYM.has(s.symbol)) return false;
+  if(SKIP_NAME.test(s.name||'')) return false;
+  if(s.sector && EXCL_SECTORS.has(s.sector)) return false;
+  if(s.industry && EXCL_INDUSTRIES.has(s.industry)) return false;
+  return true;
+}
+
+// ── SCORING ────────────────────────────────────────────────────
 function scoreStock(s) {
   let score = 0;
-  const reasons = [];
+  const signals = [];
+  const pct = s.pct, vol = s.volume, avg = s.volAvg, mc = s.mktCap;
 
-  // 1. MOMENTUM — % move today (max 30 pts)
-  const pct = Math.abs(s.pct);
+  // 1. MOMENTUM 0-30pts
   if(pct >= 2 && pct <= 8) {
-    const pts = Math.round(10 + (pct - 2) * 3.3);
-    score += Math.min(pts, 30);
-    reasons.push({ icon:'📈', text:`Up ${f2(s.pct)}% today — in ideal 2–8% gap range` });
-  } else if(pct > 0 && pct < 2) {
-    score += 8;
-    reasons.push({ icon:'📈', text:`Up ${f2(s.pct)}% — building momentum, may extend` });
+    const pts = Math.round(12 + (pct-2)*2.5); score += Math.min(pts,30);
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — in the ideal 2–8% gap zone`});
   } else if(pct > 8 && pct <= 15) {
-    score += 15;
-    reasons.push({ icon:'🚀', text:`Extended move +${f2(s.pct)}% — possible continuation or pullback` });
+    score += 18;
+    signals.push({icon:'🚀', text:`Extended move +${f2(pct)}% — momentum may continue intraday`});
+  } else if(pct > 0) {
+    score += 8;
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — building early momentum`});
   }
 
-  // 2. VOLUME SPIKE — vs average (max 25 pts)
-  if(s.volAvg > 0 && s.volume > 0) {
-    const ratio = s.volume / s.volAvg;
-    if(ratio >= 3)      { score += 25; reasons.push({ icon:'🔥', text:`Volume ${f1(ratio)}x above average — strong institutional interest` }); }
-    else if(ratio >= 2) { score += 18; reasons.push({ icon:'📊', text:`Volume ${f1(ratio)}x average — elevated activity` }); }
-    else if(ratio >= 1.2){ score += 10; reasons.push({ icon:'📊', text:`Volume ${f1(ratio)}x average — slightly above normal` }); }
-  } else if(s.volume > 1e6) {
-    score += 12;
-    reasons.push({ icon:'📊', text:`High absolute volume: ${fVol(s.volume)}` });
+  // 2. VOLUME SPIKE 0-25pts
+  if(avg > 0 && vol > 0) {
+    const ratio = vol/avg;
+    if(ratio >= 4)      {score+=25;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — exceptional institutional interest`});}
+    else if(ratio >= 2.5){score+=20;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — strong smart-money flow`});}
+    else if(ratio >= 1.5){score+=13;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — above-normal activity`});}
+    else if(ratio >= 1.1){score+=6;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — slightly elevated`});}
+  } else if(vol >= 2e6) {
+    score+=10; signals.push({icon:'📊',text:`High volume ${fV(vol)} confirms broad participation`});
   }
 
-  // 3. MARKET CAP — larger = more institutional, more stable gap (max 20 pts)
-  const mc = s.mktCap;
-  if(mc >= 50e9)       { score += 20; reasons.push({ icon:'🏢', text:`Large-cap ${fCap(mc)} — institutional liquidity, cleaner setups` }); }
-  else if(mc >= 10e9)  { score += 15; reasons.push({ icon:'🏢', text:`Mid-large cap ${fCap(mc)} — solid institutional interest` }); }
-  else if(mc >= 1e9)   { score += 10; reasons.push({ icon:'🏢', text:`Mid-cap ${fCap(mc)} — good liquidity` }); }
-  else if(mc >= 200e6) { score += 5;  reasons.push({ icon:'🏢', text:`Small-cap ${fCap(mc)} — higher risk, higher reward` }); }
+  // 3. MARKET CAP 0-20pts
+  if(mc >= 100e9)      {score+=20;signals.push({icon:'🏦',text:`Mega-cap ${fC(mc)} — heavy institutional desk activity`});}
+  else if(mc >= 20e9)  {score+=17;signals.push({icon:'🏢',text:`Large-cap ${fC(mc)} — strong institutional coverage`});}
+  else if(mc >= 5e9)   {score+=13;signals.push({icon:'🏢',text:`Mid-large cap ${fC(mc)} — good liquidity for clean moves`});}
+  else if(mc >= 1e9)   {score+=8; signals.push({icon:'🏢',text:`Mid-cap ${fC(mc)} — decent institutional interest`});}
+  else if(mc >= 200e6) {score+=4;}
 
-  // 4. BETA — higher beta = more likely to extend moves (max 15 pts)
-  if(s.beta) {
-    if(s.beta >= 1.5)      { score += 15; reasons.push({ icon:'⚡', text:`High beta ${f1(s.beta)} — amplified market moves` }); }
-    else if(s.beta >= 1.0) { score += 10; reasons.push({ icon:'⚡', text:`Beta ${f1(s.beta)} — moves with market momentum` }); }
-    else if(s.beta >= 0.5) { score += 5; }
-  }
+  // 4. BETA 0-12pts
+  const beta = parseFloat(s.beta)||0;
+  if(beta >= 2.0)      {score+=12;signals.push({icon:'⚡',text:`High beta ${f1(beta)} — amplifies market moves aggressively`});}
+  else if(beta >= 1.3) {score+=9; signals.push({icon:'⚡',text:`Beta ${f1(beta)} — above-market sensitivity to momentum`});}
+  else if(beta >= 0.8) {score+=5;}
 
-  // 5. PRICE RANGE — sweet spot $5–$500 (max 10 pts)
-  if(s.price >= 5 && s.price <= 500) {
-    score += 10;
-    if(s.price >= 10 && s.price <= 200) {
-      reasons.push({ icon:'💲', text:`Price $${f2(s.price)} — in ideal range for retail + institutional overlap` });
-    }
-  } else if(s.price > 500) {
-    score += 7;
-  }
+  // 5. PRICE RANGE 0-8pts
+  const price = s.price;
+  if(price >= 10 && price <= 300) {score+=8;}
+  else if(price >= 5)  {score+=5;}
+  else if(price >= 1)  {score+=2;}
 
-  // 6. SECTOR BONUS — tech/consumer outperform in gap setups
-  const sectorBonus = {
-    'Technology': 8, 'Consumer Cyclical': 6, 'Communication Services': 6,
-    'Industrials': 4, 'Energy': 4, 'Basic Materials': 3,
-    'Consumer Defensive': 2, 'Utilities': 1, 'Real Estate': 1,
-  };
-  const sb = sectorBonus[s.sector] || 0;
-  if(sb > 0) score += sb;
+  // 6. SECTOR BONUS 0-5pts
+  const sBonus = {'Technology':5,'Consumer Cyclical':4,'Communication Services':4,'Industrials':3,'Energy':3,'Basic Materials':2};
+  score += sBonus[s.sector]||0;
 
-  return { score: Math.min(score, 100), reasons };
+  return {score:Math.min(score,100), signals};
 }
 
-// ── FETCH ACTIVES ──────────────────────────────────────
+// ── THESIS GENERATOR ───────────────────────────────────────────
+function buildThesis(s) {
+  const parts = [];
+  const pct = s.pct, vol = s.volume, avg = s.volAvg;
+  if(pct >= 2 && pct <= 8)
+    parts.push(`${s.symbol} is up ${f2(pct)}% with price action squarely in the 2–8% gap zone.`);
+  else if(pct > 8)
+    parts.push(`${s.symbol} has surged ${f2(pct)}% — extended but follow-through momentum may continue.`);
+  else
+    parts.push(`${s.symbol} is up ${f2(pct)}% with early momentum building.`);
+  if(avg > 0 && vol/avg >= 2)
+    parts.push(`Volume running ${f1(vol/avg)}x the daily average signals strong conviction.`);
+  else if(vol >= 3e6)
+    parts.push(`High volume of ${fV(vol)} confirms broad market participation.`);
+  if(s.mktCap >= 10e9 && s.sector && s.sector !== 'Unknown')
+    parts.push(`As a ${fC(s.mktCap)} ${s.sector} company, institutional desks are likely behind this move.`);
+  else if(s.sector && s.sector !== 'Unknown')
+    parts.push(`Operating in ${s.sector} — benefits from current sector rotation.`);
+  return parts.join(' ');
+}
+
+// ── TARGET RANGE ───────────────────────────────────────────────
+function targetRange(pct, score) {
+  const base = Math.max(2, Math.min(pct * 0.75, 8));
+  const ext  = Math.min(base + (score/100)*3.5, 8);
+  return {min:Math.max(2,parseFloat(base.toFixed(1))), max:parseFloat(Math.min(ext,8).toFixed(1))};
+}
+
+// ── FETCH MOST-ACTIVES ─────────────────────────────────────────
 async function fetchActives() {
   lg('GET /stable/most-actives','data');
   const r = await fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${FMP}`);
-  if(!r.ok) throw new Error(`FMP HTTP ${r.status}`);
+  if(!r.ok) throw new Error(`FMP most-actives HTTP ${r.status}`);
   const raw = await r.json();
-  if(!Array.isArray(raw)||!raw.length) throw new Error('FMP returned empty');
-  lg(`Fields: ${Object.keys(raw[0]).join(' · ')}`, 'data');
-  const stocks = raw.map(s=>({
+  if(!Array.isArray(raw)||!raw.length) throw new Error('FMP returned empty list');
+  lg(`Fields in response: ${Object.keys(raw[0]).join(' · ')}`, 'data');
+  const list = raw.map(s=>({
     symbol: s.symbol,
     name:   s.name||s.companyName||s.symbol,
     price:  parseFloat(s.price||0),
-    pct:    parseFloat(s.changesPercentage??s.changePercentage??0),
+    pct:    parseFloat(s.changesPercentage??s.changePercentage??s.percentChange??0),
     volume: parseInt(s.volume||0),
     mktCap: parseFloat(s.marketCap||s.mktCap||0),
-  })).filter(s=>s.symbol&&s.price>0.5);
-  lg(`Parsed ${stocks.length} stocks`, 'data', 'ok');
-  return stocks;
+  })).filter(s=>s.symbol&&s.price>0);
+  lg(`Parsed ${list.length} stocks`, 'data', 'ok');
+  return list;
 }
 
-// ── FETCH PROFILES ─────────────────────────────────────
+// ── FETCH PROFILES ─────────────────────────────────────────────
+// Tries multiple FMP endpoint formats until one returns data
 async function fetchProfiles(symbols) {
-  lg(`GET /stable/profile (${symbols.length} symbols)`, 'data');
-  try {
-    // Try batch first
-    const r = await fetch(`https://financialmodelingprep.com/stable/profile?symbol=${symbols.join(',')}&apikey=${FMP}`);
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const raw = await r.json();
-    const arr = Array.isArray(raw) ? raw : (raw?.symbol ? [raw] : []);
-    const map = {};
-    arr.forEach(p=>{ if(p?.symbol) map[p.symbol]=p; });
+  lg(`Fetching profiles for ${symbols.length} symbols`, 'data');
+  const map = {};
 
-    // If batch returned nothing, try fetching first 5 individually
-    if(Object.keys(map).length === 0) {
-      lg('Batch profile empty — trying individual calls for top 5', 'data', 'warn');
-      for(const sym of symbols.slice(0,5)) {
-        try {
-          const r2 = await fetch(`https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`);
-          if(r2.ok) {
-            const d = await r2.json();
-            const p = Array.isArray(d)?d[0]:d;
-            if(p?.symbol) map[p.symbol] = p;
-          }
-        } catch(e) {}
-        await new Promise(r=>setTimeout(r,100));
+  // All known FMP profile endpoint variants to try
+  const batchUrls = [
+    `https://financialmodelingprep.com/stable/profile?symbols=${symbols.join(',')}&apikey=${FMP}`,
+    `https://financialmodelingprep.com/stable/profile?symbol=${symbols.join(',')}&apikey=${FMP}`,
+  ];
+
+  for(const url of batchUrls) {
+    try {
+      const r = await fetch(url);
+      if(!r.ok) continue;
+      const data = await r.json();
+      const arr = Array.isArray(data)?data:(data?.symbol?[data]:[]);
+      arr.forEach(p=>{ if(p?.symbol) map[p.symbol]=p; });
+      if(Object.keys(map).length > 0) {
+        lg(`Batch profiles OK: ${Object.keys(map).join(' ')}`, 'data', 'ok');
+        return map;
       }
+    } catch(e){}
+  }
+
+  // Fallback: individual calls (slower but reliable)
+  lg('Batch failed — fetching individually (top 8)', 'data', 'warn');
+  for(const sym of symbols.slice(0,8)) {
+    // Try /stable/profile/SYMBOL and /stable/profile?symbol=SYMBOL
+    const urls = [
+      `https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`,
+      `https://financialmodelingprep.com/stable/profile?symbol=${sym}&apikey=${FMP}`,
+      `https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${FMP}`,
+    ];
+    for(const url of urls) {
+      try {
+        const r = await fetch(url);
+        if(!r.ok) continue;
+        const data = await r.json();
+        const p = Array.isArray(data)?data[0]:data;
+        if(p?.symbol&&p?.sector) { map[p.symbol]=p; break; }
+      } catch(e){}
     }
+    await new Promise(r=>setTimeout(r,80));
+  }
 
-    lg(`Profiles: ${Object.keys(map).length} received (${Object.keys(map).join(' ')})`, 'data', Object.keys(map).length>0?'ok':'warn');
-    return map;
-  } catch(e) { lg(`Profile error: ${e.message}`, 'err', 'warn'); return {}; }
+  const count = Object.keys(map).length;
+  lg(`Individual profiles: ${count} loaded — ${Object.keys(map).join(' ')||'none'}`, 'data', count>0?'ok':'warn');
+
+  // If still 0 — log raw response of one symbol for debugging
+  if(count === 0) {
+    try {
+      const r = await fetch(`https://financialmodelingprep.com/stable/profile/${symbols[0]}?apikey=${FMP}`);
+      const txt = await r.text();
+      lg(`Debug raw response for ${symbols[0]}: ${txt.slice(0,120)}`, 'data', 'warn');
+    } catch(e){}
+  }
+  return map;
 }
 
-// ── FETCH NEWS (optional) ──────────────────────────────
+// ── FETCH NEWS ─────────────────────────────────────────────────
 async function fetchNews(symbol, name, apiKey) {
-  if(!apiKey) return null;
+  if(!apiKey) return [];
   try {
-    const q = encodeURIComponent(`${symbol} OR "${name}" stock`);
-    const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&sortBy=publishedAt&pageSize=3&language=en&apiKey=${apiKey}`);
-    if(!r.ok) return null;
-    const data = await r.json();
-    return data.articles?.slice(0,2).map(a=>a.title) || null;
-  } catch(e) { return null; }
+    // Use GNews API — works from browsers without CORS issues (free tier: 100 req/day)
+    const q = encodeURIComponent(`${symbol} stock`);
+    const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=3&sortby=publishedAt&token=${apiKey}`;
+    const r = await fetch(url);
+    if(!r.ok) return [];
+    const d = await r.json();
+    if(d.errors) return [];
+    return (d.articles||[]).slice(0,2).map(a=>a.title).filter(Boolean);
+  } catch(e) { return []; }
 }
 
-// ── DETERMINE TARGET RANGE ─────────────────────────────
-function targetRange(pct, score) {
-  const base = Math.max(2, Math.min(pct * 0.8, 8));
-  const ext  = Math.min(base + (score / 100) * 4, 8);
-  return { min: parseFloat(base.toFixed(1)), max: parseFloat(ext.toFixed(1)) };
-}
-
-// ── RENDER ─────────────────────────────────────────────
+// ── RENDER CARDS ───────────────────────────────────────────────
 function renderCards(picks) {
   const grid = document.getElementById('cards');
-  grid.innerHTML = '';
-  document.getElementById('results').style.display = 'block';
-  const elapsed = ((Date.now()-t0)/1000).toFixed(1);
-  const timeStr = new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
-  document.getElementById('results-meta').textContent = `${picks.length} picks · scored ${elapsed}s · ${timeStr} EST`;
+  grid.innerHTML='';
+  document.getElementById('results').style.display='block';
+  const elapsed=((Date.now()-t0)/1000).toFixed(1);
+  const timeStr=new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('r-meta').textContent=`${picks.length} picks · ${elapsed}s · ${timeStr} EST`;
 
-  picks.forEach((s, idx) => {
-    const pctChange = s.pct >= 0 ? 'up' : s.pct < -0.1 ? 'dn' : 'flat';
-    const sign = s.pct >= 0 ? '+' : '';
-    const sc = s.score;
-    const scClass = sc >= 70 ? 'a' : sc >= 45 ? 'b' : 'c';
-    const scTagClass = sc >= 70 ? 'tag-score-a' : sc >= 45 ? 'tag-score-b' : 'tag-score-c';
-    const tgt = targetRange(s.pct, sc);
+  picks.forEach((s,idx)=>{
+    const pctCls = s.pct>0.1?'up':s.pct<-0.1?'dn':'flat';
+    const sign   = s.pct>=0?'+':'';
+    const scCls  = sc(s.score);
+    const tgt    = targetRange(s.pct, s.score);
 
-    const reasonsHtml = s.reasons.slice(0,3).map(r=>
-      `<div class="reason-item"><span class="reason-icon">${r.icon}</span><span>${r.text}</span></div>`
+    const sigsHtml = s.signals.slice(0,3).map(sig=>
+      `<div class="sig-item"><span class="sig-icon">${sig.icon}</span><span>${sig.text}</span></div>`
     ).join('');
 
     const newsHtml = s.headlines?.length
-      ? `<div class="news-strip"><div class="news-strip-lbl">LATEST NEWS</div>${s.headlines.map(h=>`<div>· ${h}</div>`).join('')}</div>`
+      ? `<div class="news-block"><div class="news-lbl">Latest News</div>${s.headlines.map(h=>`<div class="news-item">${h}</div>`).join('')}</div>`
       : '';
 
+    const sectorTag = s.sector&&s.sector!=='Unknown'
+      ? `<span class="tag tag-sector">${s.sector}</span>` : '';
+
     const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
+    card.className='card';
+    card.innerHTML=`
       <div class="card-num">${String(idx+1).padStart(2,'0')}</div>
-      <div class="card-ticker">${s.symbol}</div>
-      <div class="card-company">${s.name}</div>
-      <div class="card-tags">
-        ${s.sector&&s.sector!=='Unknown'?`<span class="tag tag-sector">${s.sector}</span>`:''}
-        <span class="tag ${scTagClass}">Score ${sc}/100</span>
+      <div class="c-ticker">${s.symbol}</div>
+      <div class="c-name">${s.name}</div>
+      <div class="c-tags">
+        ${sectorTag}
+        <span class="tag tag-${scCls}">Score ${s.score}/100</span>
       </div>
-      <div class="price-bar">
+      <div class="price-row">
         <div>
-          <div class="pb-price">$${f2(s.price)}</div>
-          <div class="pb-change ${pctChange}">${sign}${f2(s.pct)}% today</div>
+          <div class="pr-price">$${f2(s.price)}</div>
+          <div class="pr-chg ${pctCls}">${sign}${f2(s.pct)}% today</div>
         </div>
-        <div class="pb-right">
-          <div class="pb-target-lbl">Target Range</div>
-          <div class="pb-target-val">+${tgt.min}% → +${tgt.max}%</div>
+        <div class="pr-right">
+          <div class="pr-tgt-lbl">Gap Target</div>
+          <div class="pr-tgt-val">+${tgt.min}% → +${tgt.max}%</div>
         </div>
       </div>
       <p class="thesis">${s.thesis}</p>
-      <div class="reasons-lbl">Why this pick</div>
-      ${reasonsHtml}
+      <div class="sig-lbl">Why this pick</div>
+      ${sigsHtml}
       ${newsHtml}
       <div class="stats-row">
-        <div class="stat"><div class="stat-val">${fVol(s.volume)}</div><div class="stat-lbl">Vol Today</div></div>
-        <div class="stat"><div class="stat-val">${fVol(s.volAvg)}</div><div class="stat-lbl">Avg Vol</div></div>
-        <div class="stat"><div class="stat-val">${fCap(s.mktCap)}</div><div class="stat-lbl">Mkt Cap</div></div>
-        <div class="stat"><div class="stat-val">${s.beta?f1(s.beta):'—'}</div><div class="stat-lbl">Beta</div></div>
+        <div class="stat"><div class="sv">${fV(s.volume)}</div><div class="sl">Vol Today</div></div>
+        <div class="stat"><div class="sv">${fV(s.volAvg)}</div><div class="sl">Avg Vol</div></div>
+        <div class="stat"><div class="sv">${fC(s.mktCap)}</div><div class="sl">Mkt Cap</div></div>
+        <div class="stat"><div class="sv">${s.beta?f1(s.beta):'—'}</div><div class="sl">Beta</div></div>
       </div>
       <div class="score-row">
         <span class="score-lbl">Gap Score</span>
-        <div class="score-track"><div class="score-fill ${scClass}" style="width:${sc}%"></div></div>
-        <span class="score-val">${sc}/100</span>
+        <div class="score-track"><div class="score-fill sf-${scCls}" style="width:${s.score}%"></div></div>
+        <span class="score-val">${s.score}/100</span>
       </div>`;
     grid.appendChild(card);
   });
 }
 
-// ── GENERATE THESIS ────────────────────────────────────
-function generateThesis(s) {
-  const parts = [];
-  const pct = s.pct;
-  const volRatio = s.volAvg > 0 ? (s.volume / s.volAvg) : 0;
-
-  if(pct >= 2 && pct <= 8)
-    parts.push(`${s.symbol} is up ${f2(pct)}% with momentum firmly in the 2–8% gap zone.`);
-  else if(pct > 8)
-    parts.push(`${s.symbol} has surged ${f2(pct)}% — extended but may continue with strong follow-through.`);
-  else
-    parts.push(`${s.symbol} is showing early momentum at ${f2(pct)}%.`);
-
-  if(volRatio >= 2)
-    parts.push(`Volume is ${f1(volRatio)}x the daily average, signalling strong conviction from buyers.`);
-  else if(s.volume > 5e6)
-    parts.push(`High absolute volume of ${fVol(s.volume)} confirms broad participation.`);
-
-  if(s.mktCap >= 10e9)
-    parts.push(`As a ${fCap(s.mktCap)} company in ${s.sector||'its sector'}, institutional desk activity is likely driving the move.`);
-  else if(s.sector && s.sector !== 'Unknown')
-    parts.push(`Operating in ${s.sector}, the stock benefits from current sector rotation.`);
-
-  return parts.join(' ');
-}
-
-// ── MAIN SCAN ──────────────────────────────────────────
+// ── MAIN SCAN ──────────────────────────────────────────────────
 async function runScan() {
-  const btn = document.getElementById('scan-btn');
-  btn.disabled = true; t0 = Date.now();
+  const btn=document.getElementById('scan-btn');
+  btn.disabled=true; t0=Date.now();
   document.getElementById('err-panel').style.display='none';
   document.getElementById('results').style.display='none';
-  document.getElementById('log-entries').innerHTML='';
+  document.getElementById('log-body').innerHTML='';
   ['s1','s2','s3','s4','s5'].forEach(id=>stepState(id,'idle'));
-  prog(4); status('Initializing…',true);
-  lg('─────────────────────────────────────');
-  lg(`Scan started · ${new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York'})} EST`);
+  prog(4); status('Starting scan…',true);
+  lg('─────────────────────────────');
+  lg(`Scan · ${new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York'})} EST`);
 
-  const newsKey    = document.getElementById('newsKey').value.trim();
-  const minMktCap  = parseFloat(document.getElementById('minMktCap').value)||0;
-  const minPct     = parseFloat(document.getElementById('minPct').value)||0;
+  const newsKey  = document.getElementById('newsKey').value.trim() || '9face43af44b9f7a5a35a13d48c6a42c';
+  const minPct   = parseFloat(document.getElementById('minPct').value)||0;
+  const minPrice = parseFloat(document.getElementById('minPrice').value)||1;
 
   try {
-    // STEP 1: Fetch actives
+    // STEP 1 — actives
     stepState('s1','active'); status('Fetching live market data…',true); prog(10);
     const allStocks = await fetchActives();
     stepState('s1','done'); prog(22);
 
-    // Filter obvious non-stocks
-    const SKIP = /^(SPY|QQQ|IWM|DIA|TLT|HYG|LQD|GLD|SLV|USO|EEM|VXX|UVXY|SVXY|BITO|IBIT|TQQQ|SQQQ|SOXL|SOXS|TZA|SPDN|TSLL|TSLS|LABD|LABU|FNGU|FNGD|XL[A-Z]|[A-Z]{2,3}[LS]$)/;
-    const candidates = allStocks.filter(s => !SKIP.test(s.symbol) && s.price >= 1 && s.pct >= minPct);
-    lg(`Candidates after filter: ${candidates.map(s=>s.symbol).join(' ')}`, 'data');
+    // Quick pre-filter by symbol/name before profile fetch
+    const preCandidates = allStocks.filter(s =>
+      !SKIP_SYM.has(s.symbol) &&
+      !SKIP_NAME.test(s.name||'') &&
+      s.price >= minPrice &&
+      s.pct >= minPct
+    );
+    lg(`Pre-filter: ${preCandidates.length} candidates → ${preCandidates.map(s=>s.symbol).join(' ')}`, 'data');
 
-    // STEP 2: Fetch profiles
-    stepState('s2','active'); status('Loading company profiles…',true); prog(35);
-    const profiles = await fetchProfiles(candidates.slice(0,25).map(s=>s.symbol));
+    if(preCandidates.length === 0) throw new Error(`No stocks passed pre-filter. Try lowering Min % or Min Price in settings. (${allStocks.length} stocks total, top mover: ${allStocks[0]?.symbol} ${f2(allStocks[0]?.pct)}%)`);
+
+    // STEP 2 — profiles + sector filter
+    stepState('s2','active'); status('Loading company profiles…',true); prog(34);
+    const profiles = await fetchProfiles(preCandidates.slice(0,20).map(s=>s.symbol));
     stepState('s2','done'); prog(50);
 
-    // Enrich with profile data
-    const enriched = candidates.slice(0,25).map(s => {
+    // Enrich and apply sector filter
+    const enriched = preCandidates.slice(0,20).map(s => {
       const p = profiles[s.symbol]||{};
-      const mktCap = parseFloat(s.mktCap||p.mktCap||p.marketCap||p.marketCapitalization||0);
       return {
         ...s,
         name:     p.companyName||p.name||s.name,
-        sector:   p.sector||'Unknown',
-        industry: p.industry||'Unknown',
-        mktCap,
+        sector:   p.sector||'',
+        industry: p.industry||'',
+        mktCap:   parseFloat(s.mktCap||p.mktCap||p.marketCap||0),
         volAvg:   parseFloat(p.volAvg||p.averageVolume||p.avgVolume||0),
         beta:     parseFloat(p.beta||0)||null,
       };
-    });
-    // Only apply mktCap filter if we actually got profile data with mktCap
-    const profilesHaveMktCap = enriched.some(s => s.mktCap > 0);
-    const enrichedFiltered = profilesHaveMktCap && minMktCap
-      ? enriched.filter(s => s.mktCap >= minMktCap)
-      : enriched;
-    lg(`Enriched: ${enrichedFiltered.length} stocks (mktCap data: ${profilesHaveMktCap?'yes':'no — skipping mktCap filter'})`, 'data', enrichedFiltered.length>0?'ok':'warn');
+    }).filter(s => isRealStock(s));
 
-    // STEP 3: Score & rank
-    stepState('s3','active'); status('Scoring candidates…',true); prog(62);
-    const scored = enrichedFiltered.map(s => {
-      const { score, reasons } = scoreStock(s);
-      const thesis = generateThesis({...s, score});
-      return { ...s, score, reasons, thesis };
-    }).sort((a,b) => b.score - a.score);
+    lg(`After sector filter: ${enriched.length} stocks — ${enriched.map(s=>`${s.symbol}(${s.sector||'?'})`).join(' ')}`, 'data', enriched.length>0?'ok':'warn');
+
+    // If profiles didn't load, fall back to pre-candidates (can't do sector filter)
+    const toScore = enriched.length > 0 ? enriched : preCandidates.slice(0,15).map(s=>({...s,sector:'',industry:'',volAvg:0,beta:null}));
+    if(enriched.length === 0) lg('No sector data — skipping sector filter, scoring by momentum + volume', 'data', 'warn');
+
+    // STEP 3 — score and rank
+    stepState('s3','active'); status('Scoring candidates…',true); prog(63);
+    const scored = toScore.map(s => {
+      const {score,signals} = scoreStock(s);
+      return {...s, score, signals, thesis: buildThesis(s)};
+    }).sort((a,b)=>b.score-a.score);
 
     const top5 = scored.slice(0,5);
-    top5.forEach((s,i) => lg(`#${i+1} ${s.symbol} — Score ${s.score}/100 | ${f2(s.pct)}% | Vol ${fVol(s.volume)} | ${s.sector}`, 'score', i===0?'ok':''));
-    stepState('s3','done'); prog(72);
+    top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | +${f2(s.pct)}% | Vol ${fV(s.volume)} | ${s.sector||'sector?'}`, 'score', i===0?'ok':''));
+    stepState('s3','done'); prog(75);
 
-    // STEP 4: News (optional)
-    stepState('s4','active'); status(newsKey ? 'Fetching live news…' : 'Skipping news (no key)', true); prog(80);
+    // STEP 4 — news
+    stepState('s4','active'); prog(82);
     if(newsKey) {
+      status('Fetching live headlines…',true);
       lg(`Fetching news for ${top5.map(s=>s.symbol).join(', ')}`, 'news');
       for(const s of top5) {
         s.headlines = await fetchNews(s.symbol, s.name, newsKey);
-        if(s.headlines) lg(`${s.symbol}: ${s.headlines[0]?.slice(0,80)}…`, 'news', 'ok');
-        await new Promise(r=>setTimeout(r,300)); // rate limit
+        if(s.headlines.length) lg(`${s.symbol}: ${s.headlines[0].slice(0,70)}…`, 'news', 'ok');
+        await new Promise(r=>setTimeout(r,250));
       }
     } else {
-      lg('No NewsAPI key — skipping live headlines', 'news', 'warn');
-      top5.forEach(s => s.headlines = null);
+      lg('No NewsAPI key — headlines skipped (add key in settings)', 'news', 'warn');
+      top5.forEach(s=>s.headlines=[]);
     }
     stepState('s4','done'); prog(90);
 
-    // STEP 5: Render
+    // STEP 5 — render
     stepState('s5','active'); status('Building report…',true);
     renderCards(top5);
     stepState('s5','done'); prog(100);
 
-    const elapsed = ((Date.now()-t0)/1000).toFixed(1);
-    status(`Complete — ${top5.length} picks in ${elapsed}s`, false);
-    lg(`Done in ${elapsed}s`, 'ok', 'ok');
-    setTimeout(()=>prog(0), 2500);
+    const elapsed=((Date.now()-t0)/1000).toFixed(1);
+    status(`Done in ${elapsed}s`,false);
+    lg(`Complete in ${elapsed}s`, 'ok', 'ok');
+    setTimeout(()=>prog(0),2500);
 
   } catch(err) {
     ['s1','s2','s3','s4','s5'].forEach(id=>{ if(document.getElementById(id).classList.contains('active')) stepState(id,'idle'); });
-    lg('Failed: '+err.message, 'err', 'err');
+    lg('Failed: '+err.message,'err','err');
     document.getElementById('err-panel').style.display='block';
     document.getElementById('err-msg').textContent=err.message;
     status('Scan failed',false); prog(0);
