@@ -629,41 +629,42 @@ async function fetchActives(){
 
 // ── FETCH PROFILES ─────────────────────────────────────
 async function fetchProfiles(symbols){
-  lg(`Fetching profiles for: ${symbols.join(', ')}`, 'data');
+  lg(`Fetching profiles for: ${symbols.slice(0,10).join(', ')}`, 'data');
   const map={};
 
-  // Fetch all symbols in parallel using v3 individual calls (most reliable)
-  const fetches = symbols.slice(0,15).map(async sym => {
-    const urls = [
-      `https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${FMP}`,
-      `https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`,
-    ];
-    for(const url of urls){
-      try{
-        const r = await fetch(url);
-        if(!r.ok) continue;
-        const d = await r.json();
-        const p = Array.isArray(d) ? d[0] : d;
-        if(p?.symbol && (p?.sector || p?.mktCap || p?.companyName)) return p;
-      }catch(e){}
-    }
+  // Correct stable endpoint: /stable/profile?symbol=SYMBOL (one at a time)
+  // Run in parallel for speed — all legacy v3 endpoints are blocked
+  const fetches = symbols.slice(0,12).map(async sym => {
+    try{
+      const url = `https://financialmodelingprep.com/stable/profile?symbol=${sym}&apikey=${FMP}`;
+      const r = await fetch(url);
+      if(!r.ok){ return null; }
+      const d = await r.json();
+      // Response is an array with one item
+      const p = Array.isArray(d) ? d[0] : d;
+      if(p?.symbol) return p;
+    }catch(e){}
     return null;
   });
 
   const results = await Promise.allSettled(fetches);
   results.forEach(r => {
-    if(r.status==='fulfilled' && r.value?.symbol) map[r.value.symbol]=r.value;
+    if(r.status==='fulfilled' && r.value?.symbol){
+      map[r.value.symbol] = r.value;
+    }
   });
 
-  lg(`Profiles: ${Object.keys(map).length}/${symbols.length} — ${Object.keys(map).join(' ')}`,
-     'data', Object.keys(map).length>0?'ok':'warn');
+  const count = Object.keys(map).length;
+  lg(`Profiles loaded: ${count}/${symbols.length} — ${Object.keys(map).join(' ')}`,
+     'data', count > 0 ? 'ok' : 'warn');
 
-  if(Object.keys(map).length===0){
+  if(count === 0){
+    // Log one raw response for debugging
     try{
-      const r=await fetch(`https://financialmodelingprep.com/api/v3/profile/${symbols[0]}?apikey=${FMP}`);
-      const txt=await r.text();
-      lg(`Profile debug (HTTP ${r.status}): ${txt.slice(0,200)}`, 'data', 'err');
-    }catch(e){}
+      const r = await fetch(`https://financialmodelingprep.com/stable/profile?symbol=${symbols[0]}&apikey=${FMP}`);
+      const txt = await r.text();
+      lg(`Profile debug (HTTP ${r.status}): ${txt.slice(0,250)}`, 'data', 'err');
+    }catch(e){ lg(`Profile debug error: ${e.message}`, 'data', 'err'); }
   }
   return map;
 }
@@ -671,9 +672,10 @@ async function fetchProfiles(symbols){
 // ── FETCH QUOTE (real-time volume) ─────────────────────
 async function fetchQuotes(symbols){
   const syms=symbols.join(',');
+  // Use stable/quote with symbol= param (confirmed working endpoint)
   for(const url of [
-    `https://financialmodelingprep.com/stable/quote?symbols=${syms}&apikey=${FMP}`,
     `https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`,
+    `https://financialmodelingprep.com/stable/quote?symbols=${syms}&apikey=${FMP}`,
   ]){
     try{
       const r=await fetch(url); if(!r.ok)continue;
@@ -738,10 +740,11 @@ function analyzeHistory(hist, currentPct){
 // ── FETCH NEWS (FMP) ───────────────────────────────────
 async function fetchNews(symbol){
   // Try multiple FMP news endpoints
+  // Only stable endpoints — v3 is legacy and blocked
   const endpoints = [
     `https://financialmodelingprep.com/stable/news/stock?symbols=${symbol}&limit=3&apikey=${FMP}`,
-    `https://financialmodelingprep.com/api/v3/stock_news?tickers=${symbol}&limit=3&apikey=${FMP}`,
     `https://financialmodelingprep.com/stable/news/general?symbols=${symbol}&limit=3&apikey=${FMP}`,
+    `https://financialmodelingprep.com/stable/news/stock?symbol=${symbol}&limit=3&apikey=${FMP}`,
   ];
   for(const url of endpoints){
     try{
