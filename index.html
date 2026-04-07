@@ -679,6 +679,11 @@ async function fetchProfiles(symbols) {
   });
   var count = Object.keys(map).length;
   lg('Profiles: ' + count + '/' + symbols.length + ' loaded - ' + Object.keys(map).join(' '), 'data', count > 0 ? 'ok' : 'warn');
+  if (count > 0) {
+    var sp = Object.values(map)[0];
+    lg('Profile fields: ' + Object.keys(sp).slice(0,12).join(', '), 'data');
+    lg('Sample ' + sp.symbol + ': mktCap=' + (sp.mktCap||sp.marketCap||'?') + ' volAvg=' + (sp.volAvg||sp.averageVolume||'?') + ' sector=' + sp.sector, 'data');
+  }
   if (count === 0) {
     fetch('https://financialmodelingprep.com/stable/profile?symbol=' + symbols[0] + '&apikey=' + FMP)
       .then(function(r) { return r.text().then(function(t) { lg('Profile debug (HTTP ' + r.status + '): ' + t.slice(0,200), 'data', 'err'); }); })
@@ -789,9 +794,12 @@ function scoreStock(s) {
   } else if (pct > 8 && pct <= 15) {
     score += 16;
     signals.push({ icon: 'UP', text: 'Up ' + f2(pct) + '% - extended but continuation possible' });
-  } else if (pct > 15) {
+  } else if (pct > 15 && pct <= 25) {
     score += 4;
-    signals.push({ icon: '!!', text: 'Up ' + f2(pct) + '% - overextended' });
+    signals.push({ icon: '!!', text: 'Up ' + f2(pct) + '% - overextended, gap occurred' });
+  } else if (pct > 25) {
+    score -= 15;
+    signals.push({ icon: '!!', text: 'Up ' + f2(pct) + '% - severely overextended, avoid' });
   } else if (pct >= 1) {
     score += 9;
     signals.push({ icon: 'UP', text: 'Up ' + f2(pct) + '% - building momentum' });
@@ -985,8 +993,8 @@ async function runScan() {
         price:    parseFloat(q.price || s.price),
         pct:      parseFloat(q.changesPercentage != null ? q.changesPercentage : (q.changePercentage != null ? q.changePercentage : s.pct)),
         volume:   parseInt(q.volume || s.volume || 0),
-        mktCap:   parseFloat(s.mktCap || p.mktCap || q.marketCap || 0),
-        volAvg:   parseFloat(p.volAvg || p.averageVolume || 0),
+        mktCap:   parseFloat(p.mktCap || p.marketCap || p.marketCapitalization || s.mktCap || q.marketCap || 0),
+        volAvg:   parseFloat(p.volAvg || p.averageVolume || p.avgVolume || 0),
         beta:     parseFloat(p.beta || 0) || null,
         sector:   p.sector || '',
         industry: p.industry || ''
