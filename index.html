@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>APEX · Gap Intelligence · v0309-1905</title>
+<title>APEX · Gap Intelligence · v2</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
@@ -18,6 +18,7 @@
 body{background:var(--ink);color:var(--text);font-family:var(--mono);min-height:100vh;}
 body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);}
 
+/* ── TOP BAR ── */
 .top-bar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:52px;border-bottom:1px solid var(--wire);background:rgba(8,11,14,0.97);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
 .wordmark{font-family:var(--serif);font-size:20px;letter-spacing:.04em;color:var(--amber2);display:flex;align-items:baseline;gap:10px;}
 .wordmark-sub{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--dim);}
@@ -28,132 +29,154 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
 .mkt-closed{background:rgba(240,80,96,.10);color:var(--rose);border:1px solid rgba(240,80,96,.18);}
 .mkt-pre{background:rgba(232,160,32,.10);color:var(--amber);border:1px solid rgba(232,160,32,.20);}
 
-.stage{max-width:1100px;margin:0 auto;padding:40px 28px 80px;}
+/* ── TABS ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--wire);background:var(--ink2);padding:0 28px;}
+.tab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:14px 20px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.tab:hover{color:var(--pale);}
+.tab.active{color:var(--amber2);border-bottom-color:var(--amber);}
 
-/* HERO */
-.hero{display:grid;grid-template-columns:1fr 280px;gap:32px;margin-bottom:40px;padding-bottom:36px;border-bottom:1px solid var(--wire);}
-.hero-eyebrow{font-size:9px;letter-spacing:.22em;color:var(--amber);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--amber);}
-.hero-h1{font-family:var(--serif);font-size:clamp(22px,2.8vw,38px);line-height:1.12;margin-bottom:10px;}
+/* ── STAGE ── */
+.stage{max-width:1200px;margin:0 auto;padding:36px 28px 80px;}
+.tab-panel{display:none;}.tab-panel.active{display:block;}
+
+/* ── SCAN PANEL ── */
+.scan-layout{display:grid;grid-template-columns:1fr 260px;gap:28px;margin-bottom:36px;padding-bottom:28px;border-bottom:1px solid var(--wire);}
+.hero-eyebrow{font-size:9px;letter-spacing:.22em;color:var(--amber);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.hero-eyebrow::before{content:'';width:18px;height:1px;background:var(--amber);}
+.hero-h1{font-family:var(--serif);font-size:clamp(20px,2.5vw,34px);line-height:1.12;margin-bottom:8px;}
 .hero-h1 em{font-style:italic;color:var(--amber2);}
-.hero-desc{font-size:11px;color:var(--mid);line-height:1.85;max-width:480px;}
+.hero-desc{font-size:11px;color:var(--mid);line-height:1.85;max-width:520px;}
+.hero-desc strong{color:var(--pale);}
 
-/* SETTINGS */
-.settings-panel{background:var(--ink2);border:1px solid var(--wire);padding:18px 20px;}
-.s-title{font-size:8px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--wire);}
-.s-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
-.s-label{font-size:9px;color:var(--mid);letter-spacing:.06em;}
-.s-input{background:var(--ink3);border:1px solid var(--wire2);color:var(--pale);font-family:var(--mono);font-size:10px;padding:6px 8px;width:100%;outline:none;transition:border .2s;}
+/* ── SETTINGS ── */
+.settings-panel{background:var(--ink2);border:1px solid var(--wire);padding:16px 18px;}
+.s-title{font-size:8px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--wire);}
+.s-row{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
+.s-label{font-size:9px;color:var(--mid);}
+.s-input{background:var(--ink3);border:1px solid var(--wire2);color:var(--pale);font-family:var(--mono);font-size:10px;padding:5px 8px;width:100%;outline:none;transition:border .2s;}
 .s-input:focus{border-color:var(--amber);}
-.s-hint{font-size:8px;color:var(--dim);line-height:1.5;}
-.s-hint a{color:var(--amber);text-decoration:none;}
-.s-hint a:hover{text-decoration:underline;}
-.s-divider{height:1px;background:var(--wire);margin:12px 0;}
-
-/* SCAN BUTTON */
-.scan-btn{width:100%;background:transparent;border:1px solid var(--amber);color:var(--amber2);font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:13px 20px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;margin-top:14px;}
+.scan-btn{width:100%;background:transparent;border:1px solid var(--amber);color:var(--amber2);font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;padding:12px 16px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;margin-top:12px;}
 .scan-btn::before{content:'';position:absolute;inset:0;background:var(--amber);transform:scaleX(0);transform-origin:left;transition:transform .25s;z-index:-1;}
 .scan-btn:hover{color:#000;}.scan-btn:hover::before{transform:scaleX(1);}
 .scan-btn:disabled{opacity:.4;cursor:not-allowed;}
-.s-status{font-size:9px;color:var(--mid);margin-top:8px;min-height:14px;text-align:center;transition:color .3s;}
+.s-status{font-size:9px;color:var(--mid);margin-top:6px;min-height:14px;text-align:center;}
 .s-status.live{color:var(--amber2);}
-.prog-track{height:1px;background:var(--wire2);margin-top:8px;overflow:hidden;}
+.prog-track{height:1px;background:var(--wire2);margin-top:6px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--amber);width:0%;transition:width .5s;box-shadow:0 0 6px rgba(232,160,32,.6);}
-
-/* STEPS */
-.steps{margin-top:14px;display:flex;flex-direction:column;gap:6px;}
-.step{display:flex;align-items:center;gap:8px;font-size:8px;letter-spacing:.1em;color:var(--dim);transition:color .3s;}
+.steps{margin-top:12px;display:flex;flex-direction:column;gap:5px;}
+.step{display:flex;align-items:center;gap:7px;font-size:8px;color:var(--dim);transition:color .3s;}
 .step.active{color:var(--amber2);}.step.done{color:var(--emerald);}
 .step-dot{width:4px;height:4px;border-radius:50%;border:1px solid currentColor;flex-shrink:0;}
 .step-pulse{display:none;width:4px;height:4px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;flex-shrink:0;}
 .step.active .step-dot{display:none;}.step.active .step-pulse{display:block;}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.6);}}
 
-/* ERROR */
-.err-panel{background:rgba(240,80,96,.07);border:1px solid rgba(240,80,96,.18);padding:16px 20px;margin-bottom:24px;display:none;}
-.err-label{font-size:8px;letter-spacing:.16em;color:var(--rose);text-transform:uppercase;margin-bottom:6px;}
+/* ── ERROR ── */
+.err-panel{background:rgba(240,80,96,.07);border:1px solid rgba(240,80,96,.18);padding:14px 18px;margin-bottom:20px;display:none;}
+.err-label{font-size:8px;letter-spacing:.14em;color:var(--rose);text-transform:uppercase;margin-bottom:5px;}
 .err-msg{font-size:11px;color:var(--pale);line-height:1.7;}
 
-/* RESULTS */
+/* ── PICKS GRID ── */
 #results{display:none;}
-.r-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--wire);}
-.r-title{font-family:var(--serif);font-size:20px;}
+.r-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--wire);}
+.r-title{font-family:var(--serif);font-size:18px;}
 .r-meta{font-size:9px;color:var(--dim);}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1px;background:var(--wire);border:1px solid var(--wire);}
-
-/* CARD */
-.card{background:var(--ink2);padding:22px;position:relative;transition:background .2s;animation:fadeUp .4s ease both;}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1px;background:var(--wire);border:1px solid var(--wire);}
+.card{background:var(--ink2);padding:20px;position:relative;transition:background .2s;animation:fadeUp .4s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-.card:nth-child(1){animation-delay:.05s;}.card:nth-child(2){animation-delay:.1s;}.card:nth-child(3){animation-delay:.15s;}.card:nth-child(4){animation-delay:.2s;}.card:nth-child(5){animation-delay:.25s;}
+.card:nth-child(1){animation-delay:.05s;}.card:nth-child(2){animation-delay:.10s;}.card:nth-child(3){animation-delay:.15s;}.card:nth-child(4){animation-delay:.20s;}.card:nth-child(5){animation-delay:.25s;}
 .card:hover{background:var(--ink3);}
-.card-num{position:absolute;top:16px;right:16px;font-family:var(--serif);font-size:32px;color:rgba(255,255,255,.03);line-height:1;pointer-events:none;}
-.c-ticker{font-family:var(--serif);font-size:24px;color:var(--text);line-height:1;margin-bottom:2px;}
-.c-name{font-size:9px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;margin-bottom:10px;}
-.c-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;}
-.tag{font-size:7px;letter-spacing:.14em;padding:2px 6px;text-transform:uppercase;font-weight:600;}
-.tag-sector{background:rgba(64,200,224,.1);color:var(--ice);border:1px solid rgba(64,200,224,.18);}
-.tag-a{background:rgba(32,201,122,.12);color:var(--emerald);border:1px solid rgba(32,201,122,.22);}
-.tag-b{background:rgba(232,160,32,.10);color:var(--amber);border:1px solid rgba(232,160,32,.20);}
-.tag-c{background:rgba(240,80,96,.09);color:var(--rose);border:1px solid rgba(240,80,96,.16);}
-
-/* PRICE ROW */
-.price-row{display:flex;align-items:center;background:var(--ink3);border:1px solid var(--wire);padding:9px 12px;margin-bottom:12px;gap:12px;}
-.pr-price{font-size:17px;font-weight:500;}
-.pr-chg{font-size:11px;font-weight:500;}
+.card-num{position:absolute;top:14px;right:14px;font-family:var(--serif);font-size:28px;color:rgba(255,255,255,.03);pointer-events:none;}
+.c-ticker{font-family:var(--serif);font-size:22px;line-height:1;margin-bottom:2px;}
+.c-name{font-size:9px;color:var(--mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;margin-bottom:9px;}
+.c-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;}
+.tag{font-size:7px;letter-spacing:.12em;padding:2px 6px;text-transform:uppercase;font-weight:600;}
+.tag-sector{background:rgba(64,200,224,.09);color:var(--ice);border:1px solid rgba(64,200,224,.16);}
+.tag-a{background:rgba(32,201,122,.10);color:var(--emerald);border:1px solid rgba(32,201,122,.20);}
+.tag-b{background:rgba(232,160,32,.09);color:var(--amber);border:1px solid rgba(232,160,32,.18);}
+.tag-c{background:rgba(240,80,96,.08);color:var(--rose);border:1px solid rgba(240,80,96,.14);}
+.price-row{display:flex;align-items:center;background:var(--ink3);border:1px solid var(--wire);padding:8px 12px;margin-bottom:10px;gap:10px;}
+.pr-price{font-size:16px;font-weight:500;}
+.pr-chg{font-size:10px;font-weight:500;}
 .pr-chg.up{color:var(--emerald);}.pr-chg.dn{color:var(--rose);}.pr-chg.flat{color:var(--mid);}
 .pr-right{margin-left:auto;text-align:right;}
-.pr-tgt-lbl{font-size:7px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
-.pr-tgt-val{font-size:12px;color:var(--amber2);font-weight:500;margin-top:1px;}
-
-/* THESIS */
-.thesis{font-size:11px;color:var(--pale);line-height:1.75;margin-bottom:10px;}
-
-/* SIGNALS */
-.sig-lbl{font-size:7px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-bottom:6px;}
-.sig-item{display:flex;gap:7px;align-items:flex-start;font-size:10px;color:var(--mid);line-height:1.55;padding:3px 0;border-bottom:1px solid var(--wire);}
+.pr-tgt-lbl{font-size:7px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;}
+.pr-tgt-val{font-size:11px;color:var(--amber2);font-weight:500;margin-top:1px;}
+.thesis{font-size:10.5px;color:var(--pale);line-height:1.7;margin-bottom:9px;}
+.sig-lbl{font-size:7px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:5px;}
+.sig-item{display:flex;gap:6px;font-size:9.5px;color:var(--mid);line-height:1.5;padding:3px 0;border-bottom:1px solid var(--wire);}
 .sig-item:last-child{border:none;}
-.sig-icon{flex-shrink:0;}
-
-/* NEWS */
-.news-block{margin-top:8px;padding:8px 10px;background:rgba(64,200,224,.04);border:1px solid rgba(64,200,224,.10);}
-.news-lbl{font-size:7px;letter-spacing:.14em;color:rgba(64,200,224,.5);text-transform:uppercase;margin-bottom:4px;}
-.news-item{font-size:9px;color:rgba(64,200,224,.75);line-height:1.6;padding:2px 0;}
+.news-block{margin-top:8px;padding:7px 9px;background:rgba(64,200,224,.04);border:1px solid rgba(64,200,224,.09);}
+.news-lbl{font-size:7px;letter-spacing:.12em;color:rgba(64,200,224,.45);text-transform:uppercase;margin-bottom:3px;}
+.news-item{font-size:9px;color:rgba(64,200,224,.7);line-height:1.55;padding:1px 0;}
 .news-item::before{content:'→ ';}
-
-/* SCORE BAR */
-.score-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--wire);}
-.score-lbl{font-size:7px;color:var(--dim);letter-spacing:.1em;flex-shrink:0;}
+.hist-block{margin-top:7px;padding:7px 9px;background:rgba(152,120,240,.04);border:1px solid rgba(152,120,240,.09);}
+.hist-lbl{font-size:7px;letter-spacing:.12em;color:rgba(152,120,240,.5);text-transform:uppercase;margin-bottom:3px;}
+.hist-stat{font-size:9px;color:rgba(152,120,240,.8);line-height:1.6;}
+.score-row{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid var(--wire);}
+.score-lbl{font-size:7px;color:var(--dim);flex-shrink:0;}
 .score-track{flex:1;height:2px;background:var(--wire2);}
 .score-fill{height:100%;transition:width 1.2s ease .3s;}
 .sf-a{background:var(--emerald);}.sf-b{background:var(--amber);}.sf-c{background:var(--rose);}
 .score-val{font-size:8px;color:var(--pale);flex-shrink:0;}
-
-/* STATS */
-.stats-row{display:flex;gap:14px;margin-top:10px;}
+.stats-row{display:flex;gap:12px;margin-top:9px;}
 .stat{text-align:center;}
 .sv{font-size:10px;font-weight:500;color:var(--pale);}
-.sl{font-size:7px;letter-spacing:.1em;color:var(--dim);margin-top:1px;}
+.sl{font-size:7px;letter-spacing:.08em;color:var(--dim);margin-top:1px;}
 
-/* LOG */
-#log-wrap{margin-top:40px;border:1px solid var(--wire);}
-.log-top{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--wire);cursor:pointer;user-select:none;}
+/* ── HISTORY TABLE ── */
+.hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.hist-title{font-family:var(--serif);font-size:18px;}
+.hist-subtitle{font-size:9px;color:var(--dim);margin-top:3px;}
+.summary-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--wire);border:1px solid var(--wire);margin-bottom:24px;}
+.summary-cell{background:var(--ink2);padding:16px 20px;text-align:center;}
+.summary-val{font-family:var(--serif);font-size:24px;color:var(--text);margin-bottom:4px;}
+.summary-val.green{color:var(--emerald);}.summary-val.red{color:var(--rose);}.summary-val.amber{color:var(--amber2);}
+.summary-lbl{font-size:8px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:10px;}
+thead tr{border-bottom:1px solid var(--wire2);}
+th{text-align:left;padding:8px 12px;font-size:8px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;font-weight:500;white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--wire);transition:background .15s;}
+tbody tr:hover{background:var(--ink3);}
+td{padding:8px 12px;color:var(--pale);vertical-align:middle;white-space:nowrap;}
+td.sym{font-family:var(--serif);font-size:14px;color:var(--text);}
+td.up{color:var(--emerald);font-weight:500;}
+td.dn{color:var(--rose);font-weight:500;}
+td.flat{color:var(--mid);}
+.verdict{display:inline-flex;align-items:center;gap:4px;font-size:8px;letter-spacing:.1em;padding:2px 8px;border-radius:1px;text-transform:uppercase;font-weight:600;}
+.verdict-hit{background:rgba(32,201,122,.12);color:var(--emerald);border:1px solid rgba(32,201,122,.2);}
+.verdict-miss{background:rgba(240,80,96,.09);color:var(--rose);border:1px solid rgba(240,80,96,.16);}
+.verdict-pending{background:rgba(232,160,32,.09);color:var(--amber);border:1px solid rgba(232,160,32,.16);}
+.verdict-partial{background:rgba(64,200,224,.09);color:var(--ice);border:1px solid rgba(64,200,224,.16);}
+.empty-state{text-align:center;padding:56px 20px;color:var(--dim);}
+.empty-icon{font-size:32px;margin-bottom:12px;}
+.empty-title{font-family:var(--serif);font-size:16px;color:var(--mid);margin-bottom:6px;}
+.empty-desc{font-size:10px;line-height:1.7;}
+.verify-btn{background:transparent;border:1px solid var(--dim);color:var(--mid);font-family:var(--mono);font-size:8px;letter-spacing:.12em;padding:4px 10px;cursor:pointer;transition:all .2s;}
+.verify-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+/* ── LOG ── */
+#log-wrap{margin-top:36px;border:1px solid var(--wire);}
+.log-top{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--wire);cursor:pointer;user-select:none;}
 .log-lbl{font-size:8px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;}
 .log-cnt{font-size:8px;color:var(--dim);}
 .log-btn{font-size:8px;color:var(--dim);}
-#log-body{max-height:220px;overflow-y:auto;padding:6px 14px;scrollbar-width:thin;scrollbar-color:var(--ink3) transparent;}
-.lr{display:flex;gap:8px;align-items:baseline;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);font-size:9px;line-height:1.55;}
+#log-body{max-height:200px;overflow-y:auto;padding:5px 14px;scrollbar-width:thin;scrollbar-color:var(--ink3) transparent;}
+.lr{display:flex;gap:8px;align-items:baseline;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);font-size:9px;line-height:1.5;}
 .lt{color:var(--dim);flex-shrink:0;font-size:8px;}
-.lp{flex-shrink:0;font-size:7px;letter-spacing:.08em;padding:1px 4px;text-transform:uppercase;}
+.lp{flex-shrink:0;font-size:7px;padding:1px 4px;text-transform:uppercase;}
 .lp.data{background:rgba(64,200,224,.08);color:var(--ice);}
-.lp.score{background:rgba(152,120,240,.10);color:var(--violet);}
+.lp.score{background:rgba(152,120,240,.09);color:var(--violet);}
 .lp.news{background:rgba(232,160,32,.08);color:var(--amber);}
 .lp.ok{background:rgba(32,201,122,.08);color:var(--emerald);}
 .lp.err{background:rgba(240,80,96,.08);color:var(--rose);}
+.lp.db{background:rgba(152,120,240,.12);color:var(--violet);}
 .lm{color:var(--mid);flex:1;}
 .lm.ok{color:var(--emerald);}.lm.warn{color:var(--amber2);}.lm.err{color:var(--rose);}
 
-.foot{text-align:center;font-size:8px;color:var(--dim);letter-spacing:.14em;padding:24px;border-top:1px solid var(--wire);margin-top:56px;text-transform:uppercase;}
-@media(max-width:640px){.hero{grid-template-columns:1fr;}.cards{grid-template-columns:1fr;}}
+.foot{text-align:center;font-size:8px;color:var(--dim);letter-spacing:.12em;padding:20px;border-top:1px solid var(--wire);margin-top:48px;text-transform:uppercase;}
+@media(max-width:680px){.scan-layout{grid-template-columns:1fr;}.summary-strip{grid-template-columns:repeat(2,1fr);}.cards{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -166,77 +189,125 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
   </div>
 </header>
 
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scan')">◈ Today's Scan</div>
+  <div class="tab" onclick="switchTab('history')">📋 Prediction History</div>
+</div>
+
 <div class="stage">
-  <div class="hero">
-    <div>
-      <div class="hero-eyebrow">Real-Time Gap Screener</div>
-      <h1 class="hero-h1">Top 5 stocks poised<br>to gain <em>2–8% today</em></h1>
-      <p class="hero-desc">
-        Scans most-active US stocks, pulls live company data and news headlines,
-        filters out ETFs, leveraged funds, healthcare and financial stocks —
-        then scores remaining candidates on momentum, volume spike, market cap,
-        beta, sector and news sentiment to surface the best gap setups.
-      </p>
+
+  <!-- ══ SCAN TAB ══ -->
+  <div class="tab-panel active" id="tab-scan">
+    <div class="scan-layout">
+      <div>
+        <div class="hero-eyebrow">AI Gap Screener + Historical Validation</div>
+        <h1 class="hero-h1">Top 5 stocks poised<br>to gain <em>2–8% today</em></h1>
+        <p class="hero-desc">
+          Scans most-active stocks, enriches with <strong>20+ years of historical data</strong>,
+          scores on momentum, volume spike, win-rate history, beta and sector strength.
+          Every prediction is saved and verified next day — building a live accuracy record.
+        </p>
+      </div>
+      <div class="settings-panel">
+        <div class="s-title">⚙ Settings</div>
+        <div class="s-row">
+          <div class="s-label">Min % move today</div>
+          <select class="s-input" id="minPct">
+            <option value="0">Any</option>
+            <option value="1" selected>≥ 1%</option>
+            <option value="2">≥ 2%</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <div class="s-label">Min price</div>
+          <select class="s-input" id="minPrice">
+            <option value="5" selected>$5+</option>
+            <option value="10">$10+</option>
+            <option value="20">$20+</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <div class="s-label">Supabase URL</div>
+          <input class="s-input" id="sbUrl" placeholder="https://xxx.supabase.co" />
+        </div>
+        <div class="s-row">
+          <div class="s-label">Supabase Anon Key</div>
+          <input class="s-input" id="sbKey" placeholder="eyJ…" type="password" />
+        </div>
+        <button class="scan-btn" id="scan-btn" onclick="runScan()">◈ &nbsp;Run Scan</button>
+        <div class="s-status" id="status-text">Ready</div>
+        <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
+        <div class="steps">
+          <div class="step" id="s1"><div class="step-dot"></div><div class="step-pulse"></div>Fetch live actives</div>
+          <div class="step" id="s2"><div class="step-dot"></div><div class="step-pulse"></div>Profiles + sector filter</div>
+          <div class="step" id="s3"><div class="step-dot"></div><div class="step-pulse"></div>Historical analysis (20yr)</div>
+          <div class="step" id="s4"><div class="step-dot"></div><div class="step-pulse"></div>Score + rank</div>
+          <div class="step" id="s5"><div class="step-dot"></div><div class="step-pulse"></div>News + save to DB</div>
+        </div>
+      </div>
     </div>
 
-    <div class="settings-panel">
-      <div class="s-title">⚙ Configuration</div>
+    <div class="err-panel" id="err-panel">
+      <div class="err-label">⚠ Error</div>
+      <div class="err-msg" id="err-msg"></div>
+    </div>
 
-      <div class="s-row">
-        <div class="s-label">NewsAPI Key <span style="color:var(--dim)">(optional)</span></div>
-        <input class="s-input" id="newsKey" placeholder="sk-… paste key here" value="9face43af44b9f7a5a35a13d48c6a42c" />
-        <div class="s-hint">Free 100 calls/day at <a href="https://gnews.io/register" target="_blank">gnews.io</a> — works from GitHub Pages</div>
+    <div id="results">
+      <div class="r-header">
+        <div class="r-title">Today's Top Gap Candidates</div>
+        <div class="r-meta" id="r-meta"></div>
       </div>
-
-      <div class="s-divider"></div>
-
-      <div class="s-row">
-        <div class="s-label">Min % move today</div>
-        <select class="s-input" id="minPct">
-          <option value="0">Any (show all)</option>
-          <option value="1">≥ 1%</option>
-          <option value="1" selected>≥ 1%</option>
-          <option value="2">≥ 2%</option>
-          <option value="3">≥ 3%</option>
-        </select>
-      </div>
-
-      <div class="s-row">
-        <div class="s-label">Min price</div>
-        <select class="s-input" id="minPrice">
-          <option value="1">$1+</option>
-          <option value="5" selected>$5+</option>
-          <option value="10">$10+</option>
-        </select>
-      </div>
-
-      <button class="scan-btn" id="scan-btn" onclick="runScan()">◈ &nbsp;Run Scan</button>
-      <div class="s-status" id="status-text">Ready</div>
-      <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
-
-      <div class="steps">
-        <div class="step" id="s1"><div class="step-dot"></div><div class="step-pulse"></div>Fetch most-actives</div>
-        <div class="step" id="s2"><div class="step-dot"></div><div class="step-pulse"></div>Load profiles + filter</div>
-        <div class="step" id="s3"><div class="step-dot"></div><div class="step-pulse"></div>Score &amp; rank</div>
-        <div class="step" id="s4"><div class="step-dot"></div><div class="step-pulse"></div>Fetch live news</div>
-        <div class="step" id="s5"><div class="step-dot"></div><div class="step-pulse"></div>Build report</div>
-      </div>
+      <div class="cards" id="cards"></div>
     </div>
   </div>
 
-  <div class="err-panel" id="err-panel">
-    <div class="err-label">⚠ Error</div>
-    <div class="err-msg" id="err-msg"></div>
-  </div>
-
-  <div id="results">
-    <div class="r-header">
-      <div class="r-title">Today's Top Gap Candidates</div>
-      <div class="r-meta" id="r-meta"></div>
+  <!-- ══ HISTORY TAB ══ -->
+  <div class="tab-panel" id="tab-history">
+    <div class="hist-header">
+      <div>
+        <div class="hist-title">Prediction History</div>
+        <div class="hist-subtitle">Every daily pick — verified against actual open/close prices</div>
+      </div>
+      <button class="verify-btn" onclick="runVerification()">⟳ Verify Yesterday's Picks</button>
     </div>
-    <div class="cards" id="cards"></div>
+
+    <div class="summary-strip" id="summary-strip">
+      <div class="summary-cell"><div class="summary-val amber" id="sum-total">—</div><div class="summary-lbl">Total Picks</div></div>
+      <div class="summary-cell"><div class="summary-val green" id="sum-hits">—</div><div class="summary-lbl">Hits (2–8% achieved)</div></div>
+      <div class="summary-cell"><div class="summary-val red" id="sum-misses">—</div><div class="summary-lbl">Misses</div></div>
+      <div class="summary-cell"><div class="summary-val amber" id="sum-rate">—</div><div class="summary-lbl">Success Rate</div></div>
+    </div>
+
+    <div class="err-panel" id="hist-err-panel">
+      <div class="err-label">⚠ Database not connected</div>
+      <div class="err-msg" id="hist-err-msg">Add your Supabase URL and Key in the Scan tab settings to enable history tracking.</div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="hist-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th>Sector</th>
+            <th>Score</th>
+            <th>Target</th>
+            <th>Open</th>
+            <th>Close</th>
+            <th>Actual %</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody id="hist-body">
+          <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-desc">Run your first scan to start building the prediction record.</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
+  <!-- LOG -->
   <div id="log-wrap" style="display:none">
     <div class="log-top" onclick="toggleLog()">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -252,343 +323,469 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;b
 <div class="foot">Apex · Not financial advice · Educational purposes only</div>
 
 <script>
+// ════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════
 const FMP = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
 let logVisible = true, t0 = 0;
 
-// ── CLOCK ──────────────────────────────────────────────────────
-function tick() {
-  const est = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  const p = n => String(n).padStart(2,'0');
-  document.getElementById('live-clock').textContent =
-    `${p(est.getHours())}:${p(est.getMinutes())}:${p(est.getSeconds())} EST`;
-  const b = document.getElementById('mkt-badge');
-  const d = est.getDay(), hm = est.getHours()*60+est.getMinutes();
-  if(d===0||d===6)   {b.className='mkt-pill mkt-closed';b.textContent='Weekend';}
-  else if(hm<570)    {b.className='mkt-pill mkt-pre';b.textContent='Pre-Market';}
-  else if(hm<960)    {b.className='mkt-pill mkt-open';b.textContent='● Live';}
-  else               {b.className='mkt-pill mkt-closed';b.textContent='After-Hours';}
+// ── DB helpers ──────────────────────────────────────────
+function getSB() {
+  const url = document.getElementById('sbUrl').value.trim() || localStorage.getItem('sbUrl') || '';
+  const key = document.getElementById('sbKey').value.trim() || localStorage.getItem('sbKey') || '';
+  if(url) localStorage.setItem('sbUrl', url);
+  if(key) localStorage.setItem('sbKey', key);
+  return { url, key, ok: !!(url && key) };
+}
+
+async function dbQuery(path, method='GET', body=null) {
+  const {url, key} = getSB();
+  // Supabase REST API requires the key in the 'apikey' header for BOTH
+  // legacy (eyJ...) and new (sb_publishable_...) key formats.
+  // For new keys, do NOT put them in Authorization: Bearer — use apikey only.
+  const isLegacy = key.startsWith('eyJ');
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': key,
+    // Legacy keys are also valid JWTs so can go in Authorization too
+    // New sb_publishable_ keys must NOT go in Authorization (they're not JWTs)
+    'Authorization': isLegacy ? `Bearer ${key}` : `Bearer ${key}`,
+  };
+  if(method === 'POST' || method === 'PATCH') headers['Prefer'] = 'return=representation';
+
+  const opts = { method, headers };
+  if(body) opts.body = JSON.stringify(body);
+
+  const r = await fetch(`${url}/rest/v1/${path}`, opts);
+  if(!r.ok) {
+    const txt = await r.text();
+    throw new Error(`DB ${r.status}: ${txt.slice(0,200)}`);
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+async function ensureTable() {
+  // Supabase requires table to be created via Dashboard — check if it exists
+  try {
+    await dbQuery('apex_predictions?limit=1');
+    lg('DB table verified ✓', 'db', 'ok');
+    return true;
+  } catch(e) {
+    lg(`DB table missing — create it in Supabase Dashboard (see instructions)`, 'db', 'warn');
+    return false;
+  }
+}
+
+async function savePredictions(picks, dateStr) {
+  const rows = picks.map(s => ({
+    date:           dateStr,
+    symbol:         s.symbol,
+    company:        s.name,
+    sector:         s.sector || '',
+    score:          s.score,
+    target_min:     s.targetMin,
+    target_max:     s.targetMax,
+    open_price:     null,
+    close_price:    null,
+    actual_pct:     null,
+    verdict:        'pending',
+    price_at_scan:  s.price,
+    pct_at_scan:    s.pct,
+    hist_win_rate:  s.histWinRate || null,
+    hist_avg_gain:  s.histAvgGain || null,
+    thesis:         s.thesis,
+    created_at:     new Date().toISOString(),
+  }));
+  const result = await dbQuery('apex_predictions', 'POST', rows);
+  lg(`Saved ${rows.length} predictions to DB for ${dateStr}`, 'db', 'ok');
+  return result;
+}
+
+async function loadHistory() {
+  const data = await dbQuery('apex_predictions?order=date.desc,score.desc&limit=200');
+  return data || [];
+}
+
+async function verifyPredictions() {
+  // Get pending predictions older than today
+  const today = new Date().toISOString().split('T')[0];
+  const pending = await dbQuery(`apex_predictions?verdict=eq.pending&date=lt.${today}&select=id,symbol,date,target_min,target_max`);
+  if(!pending || pending.length === 0) { lg('No pending predictions to verify', 'db'); return 0; }
+  lg(`Verifying ${pending.length} pending predictions…`, 'db');
+
+  let verified = 0;
+  for(const pred of pending) {
+    try {
+      // Fetch actual daily price for that date from FMP
+      const url = `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${pred.symbol}&from=${pred.date}&to=${pred.date}&apikey=${FMP}`;
+      const r = await fetch(url);
+      if(!r.ok) continue;
+      const data = await r.json();
+      const hist = data?.historical || (Array.isArray(data) ? data : []);
+      const day = hist.find(d => d.date === pred.date) || hist[0];
+      if(!day) continue;
+
+      const openPrice  = parseFloat(day.open);
+      const closePrice = parseFloat(day.close);
+      const actualPct  = ((closePrice - openPrice) / openPrice) * 100;
+      let verdict = 'miss';
+      if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict = 'hit';
+      else if(actualPct >= 2 && actualPct < pred.target_min) verdict = 'partial';
+
+      await dbQuery(`apex_predictions?id=eq.${pred.id}`, 'PATCH', {
+        open_price:  openPrice,
+        close_price: closePrice,
+        actual_pct:  parseFloat(actualPct.toFixed(2)),
+        verdict,
+      });
+      lg(`${pred.symbol} ${pred.date}: open=$${f2(openPrice)} close=$${f2(closePrice)} actual=${f2(actualPct)}% → ${verdict.toUpperCase()}`, 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'');
+      verified++;
+    } catch(e) { lg(`Verify error ${pred.symbol}: ${e.message}`, 'db', 'err'); }
+    await sleep(150);
+  }
+  return verified;
+}
+
+// ── TAB ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab[onclick*="${tab}"]`).classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  if(tab === 'history') loadHistoryTab();
+}
+
+async function loadHistoryTab() {
+  const {ok} = getSB();
+  if(!ok) {
+    document.getElementById('hist-err-panel').style.display='block';
+    return;
+  }
+  document.getElementById('hist-err-panel').style.display='none';
+  try {
+    const rows = await loadHistory();
+    renderHistoryTable(rows);
+  } catch(e) {
+    document.getElementById('hist-err-panel').style.display='block';
+    document.getElementById('hist-err-msg').textContent = 'Could not load history: ' + e.message;
+  }
+}
+
+function renderHistoryTable(rows) {
+  const tbody = document.getElementById('hist-body');
+  if(!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-desc">Run your first scan to start building the prediction record.</div></div></td></tr>`;
+    return;
+  }
+
+  // Summary stats
+  const verified = rows.filter(r=>r.verdict!=='pending');
+  const hits     = rows.filter(r=>r.verdict==='hit');
+  const partial  = rows.filter(r=>r.verdict==='partial');
+  const misses   = rows.filter(r=>r.verdict==='miss');
+  const rate     = verified.length ? Math.round((hits.length+partial.length*0.5)/verified.length*100) : 0;
+
+  document.getElementById('sum-total').textContent   = rows.length;
+  document.getElementById('sum-hits').textContent    = hits.length;
+  document.getElementById('sum-misses').textContent  = misses.length;
+  document.getElementById('sum-rate').textContent    = verified.length ? rate+'%' : '—';
+
+  tbody.innerHTML = rows.map(r => {
+    const verdictHtml = {
+      hit:     '<span class="verdict verdict-hit">✓ Hit</span>',
+      miss:    '<span class="verdict verdict-miss">✗ Miss</span>',
+      partial: '<span class="verdict verdict-partial">~ Partial</span>',
+      pending: '<span class="verdict verdict-pending">⏳ Pending</span>',
+    }[r.verdict] || '<span class="verdict verdict-pending">⏳ Pending</span>';
+
+    const actualCls = r.actual_pct >= 2 ? 'up' : r.actual_pct < 0 ? 'dn' : 'flat';
+    return `<tr>
+      <td>${r.date}</td>
+      <td class="sym">${r.symbol}</td>
+      <td style="color:var(--mid);max-width:140px;overflow:hidden;text-overflow:ellipsis;">${r.company||'—'}</td>
+      <td style="color:var(--dim);font-size:9px;">${r.sector||'—'}</td>
+      <td>${r.score}/100</td>
+      <td style="color:var(--amber2);">+${f2(r.target_min)}%→+${f2(r.target_max)}%</td>
+      <td>${r.open_price ? '$'+f2(r.open_price) : '—'}</td>
+      <td>${r.close_price ? '$'+f2(r.close_price) : '—'}</td>
+      <td class="${actualCls}">${r.actual_pct!=null ? (r.actual_pct>=0?'+':'')+f2(r.actual_pct)+'%' : '—'}</td>
+      <td>${verdictHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function runVerification() {
+  const {ok} = getSB();
+  if(!ok) { alert('Add Supabase credentials in the Scan tab settings first.'); return; }
+  const btn = document.querySelector('.verify-btn');
+  btn.textContent='⟳ Verifying…'; btn.disabled=true;
+  try {
+    const count = await verifyPredictions();
+    const rows = await loadHistory();
+    renderHistoryTable(rows);
+    lg(`Verification complete — ${count} updated`, 'db', 'ok');
+  } catch(e) {
+    lg('Verification failed: '+e.message, 'db', 'err');
+  }
+  btn.textContent='⟳ Verify Yesterday\'s Picks'; btn.disabled=false;
+}
+
+// ── CLOCK ──────────────────────────────────────────────
+function tick(){
+  const est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const p=n=>String(n).padStart(2,'0');
+  document.getElementById('live-clock').textContent=`${p(est.getHours())}:${p(est.getMinutes())}:${p(est.getSeconds())} EST`;
+  const b=document.getElementById('mkt-badge');
+  const d=est.getDay(),hm=est.getHours()*60+est.getMinutes();
+  if(d===0||d===6){b.className='mkt-pill mkt-closed';b.textContent='Weekend';}
+  else if(hm<570){b.className='mkt-pill mkt-pre';b.textContent='Pre-Market';}
+  else if(hm<960){b.className='mkt-pill mkt-open';b.textContent='● Live';}
+  else{b.className='mkt-pill mkt-closed';b.textContent='After-Hours';}
 }
 setInterval(tick,1000); tick();
 
-// ── LOG ────────────────────────────────────────────────────────
-function lg(msg, phase='', type='') {
+// ── LOG ────────────────────────────────────────────────
+function lg(msg,phase='',type=''){
   document.getElementById('log-wrap').style.display='block';
-  const now=new Date(), p=n=>String(n).padStart(2,'0');
+  const now=new Date(),p=n=>String(n).padStart(2,'0');
   const ts=`${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
-  const el=document.createElement('div'); el.className='lr';
+  const el=document.createElement('div');el.className='lr';
   const ph=phase?`<span class="lp ${phase}">${phase}</span>`:'';
   el.innerHTML=`<span class="lt">${ts}</span>${ph}<span class="lm ${type}">${msg}</span>`;
-  const b=document.getElementById('log-body'); b.appendChild(el); b.scrollTop=b.scrollHeight;
+  const b=document.getElementById('log-body');b.appendChild(el);b.scrollTop=b.scrollHeight;
   document.getElementById('log-cnt').textContent=`(${b.querySelectorAll('.lr').length})`;
 }
 function toggleLog(){logVisible=!logVisible;document.getElementById('log-body').style.display=logVisible?'block':'none';document.getElementById('log-btn').textContent=logVisible?'▲ collapse':'▼ expand';}
 function prog(p){document.getElementById('prog').style.width=p+'%';}
 function status(msg,live=false){const e=document.getElementById('status-text');e.textContent=msg;e.className='s-status'+(live?' live':'');}
 function stepState(id,s){document.getElementById(id).className='step'+(s==='active'?' active':s==='done'?' done':'');}
-
-// ── UTILS ──────────────────────────────────────────────────────
 const f2=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(2);
 const f1=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(1);
-function fV(v){if(v===null||v===undefined||v===''||isNaN(v))return'—';const n=parseInt(v);if(n<=0)return'—';if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return String(n);}
+function fV(v){if(!v||parseInt(v)<=0)return'—';const n=parseInt(v);if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return String(n);}
 function fC(v){if(!v||v<1)return'—';if(v>=1e12)return'$'+(v/1e12).toFixed(1)+'T';if(v>=1e9)return'$'+(v/1e9).toFixed(0)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(0)+'M';return'$'+v;}
-function sc(n){return n>=70?'a':n>=45?'b':'c';}
+function scClass(n){return n>=70?'a':n>=45?'b':'c';}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-// ── EXCLUDED ───────────────────────────────────────────────────
-// Symbols: ETFs, leveraged, inverse, crypto, bond, commodity funds
-const SKIP_SYM = new Set([
-  'SPY','QQQ','IWM','DIA','MDY','VTI','VOO','IVV','GLD','SLV','USO','UNG',
-  'TLT','IEF','SHY','HYG','LQD','AGG','BND','JNK',
-  'EEM','EFA','FXI','EWJ','EWZ','VWO',
-  'VXX','UVXY','SVXY','VIXY',
-  'TQQQ','SQQQ','SPXL','SPXS','UDOW','SDOW','TNA','TZA','LABU','LABD',
-  'SOXL','SOXS','FNGU','FNGD','BULZ','BERZ','WEBL','WEBS',
-  'TSLL','TSLS','TSLQ','NVDL','NVDD','NVD','TSDD','CONL','COIG','COIA',
-  'NBIG','NBIL','MSTU','MSTD','SPDN','BITO','IBIT','GBTC','ETHE',
-  'XLF','XLE','XLK','XLV','XLI','XLB','XLP','XLU','XLY','XLRE',
-  'GDX','GDXJ','SLX','KRE','KBE','IAT','IYF','IBB','XBI',
-]);
-// Name keywords for leveraged/inverse/ETF products
-const SKIP_NAME = /\b(2x|3x|ultra|short|inverse|daily|leveraged|bear|bull etf|proshares|direxion|graniteShares|wisdomtree fund|ishares|vanguard etf|spdr)\b/i;
-// Sectors to exclude
-// Sectors fully excluded
-const EXCL_SECTORS = new Set(['Financial Services','Real Estate','Utilities']);
-// Industries excluded regardless of sector (pure pharma/biotech/banking)
-const EXCL_INDUSTRIES = new Set([
-  'Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic',
-  'Pharmaceutical Retailers','Medical Instruments & Supplies',
-  'Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty',
-  'Insurance—Diversified','Capital Markets','Asset Management',
-  'Mortgage Finance','Credit Services','Financial Conglomerates',
-]);
-// Log why stocks are excluded for debugging
-function exclusionReason(s) {
-  if(EXCL_SECTORS.has(s.sector)) return `Sector: ${s.sector}`;
-  if(EXCL_INDUSTRIES.has(s.industry)) return `Industry: ${s.industry}`;
-  if(SKIP_SYM.has(s.symbol)) return 'Known ETF/fund';
-  if(SKIP_NAME.test(s.name||'')) return 'Name matches ETF/leveraged pattern';
-  return null;
-}
+// ── EXCLUSIONS ─────────────────────────────────────────
+const SKIP_SYM = new Set(['SPY','QQQ','IWM','DIA','MDY','VTI','VOO','IVV','GLD','SLV','USO','UNG','TLT','IEF','SHY','HYG','LQD','AGG','BND','JNK','EEM','EFA','FXI','EWJ','EWZ','VWO','VXX','UVXY','SVXY','VIXY','TQQQ','SQQQ','SPXL','SPXS','UDOW','SDOW','TNA','TZA','LABU','LABD','SOXL','SOXS','FNGU','FNGD','BULZ','BERZ','WEBL','WEBS','TSLL','TSLS','TSLQ','NVDL','NVDD','NVD','TSDD','CONL','COIG','COIA','NBIG','NBIL','MSTU','MSTD','SPDN','BITO','IBIT','GBTC','ETHE','XLF','XLE','XLK','XLV','XLI','XLB','XLP','XLU','XLY','XLRE','GDX','GDXJ','SLX','KRE','KBE','IAT','IYF','IBB','XBI']);
+const SKIP_NAME=/\b(2x|3x|ultra|short|inverse|daily|leveraged|bear etf|bull etf|proshares|direxion|graniteShares|wisdomtree fund|ishares etf|vanguard etf|spdr)\b/i;
+const EXCL_SECTORS=new Set(['Financial Services','Real Estate','Utilities']);
+const EXCL_IND=new Set(['Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic','Pharmaceutical Retailers','Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty','Insurance—Diversified','Capital Markets','Asset Management','Mortgage Finance','Credit Services']);
 
-function isRealStock(s) {
-  if(SKIP_SYM.has(s.symbol)) return false;
-  if(SKIP_NAME.test(s.name||'')) return false;
-  if(s.sector && EXCL_SECTORS.has(s.sector)) return false;
-  if(s.industry && EXCL_INDUSTRIES.has(s.industry)) return false;
+function isRealStock(s){
+  if(SKIP_SYM.has(s.symbol))return false;
+  if(SKIP_NAME.test(s.name||''))return false;
+  if(s.sector&&EXCL_SECTORS.has(s.sector))return false;
+  if(s.industry&&EXCL_IND.has(s.industry))return false;
   return true;
 }
-function filterWithLog(stocks) {
-  return stocks.filter(s => {
-    if(SKIP_SYM.has(s.symbol))         { lg(`SKIP ${s.symbol} — known ETF/fund`, 'data'); return false; }
-    if(SKIP_NAME.test(s.name||''))      { lg(`SKIP ${s.symbol} — name: ${s.name}`, 'data'); return false; }
-    if(EXCL_SECTORS.has(s.sector))      { lg(`SKIP ${s.symbol} — sector: ${s.sector}`, 'data'); return false; }
-    if(EXCL_INDUSTRIES.has(s.industry)) { lg(`SKIP ${s.symbol} — industry: ${s.industry}`, 'data'); return false; }
-    return true;
-  });
-}
 
-// ── SCORING ────────────────────────────────────────────────────
-function scoreStock(s) {
-  let score = 0;
-  const signals = [];
-  const pct = s.pct, vol = s.volume, avg = s.volAvg, mc = s.mktCap;
-
-  // 1. MOMENTUM 0-30pts — only positive movers qualify for gap plays
-  if(pct < 0) {
-    // Negative — no momentum points, major penalty
-    score -= 10;
-    signals.push({icon:'📉', text:`Down ${f2(pct)}% today — not a gap candidate`});
-  } else if(pct >= 2 && pct <= 8) {
-    const pts = Math.round(12 + (pct-2)*2.5); score += Math.min(pts,30);
-    signals.push({icon:'📈', text:`Up ${f2(pct)}% — squarely in the 2–8% target gap zone`});
-  } else if(pct > 8 && pct <= 15) {
-    score += 14;
-    signals.push({icon:'🚀', text:`Up ${f2(pct)}% — extended but follow-through possible`});
-  } else if(pct > 15) {
-    score += 4;
-    signals.push({icon:'⚠️', text:`Up ${f2(pct)}% — too extended, gap already happened`});
-  } else if(pct >= 0) {
-    score += 6;
-    signals.push({icon:'📈', text:`Up ${f2(pct)}% — early momentum, watch for continuation`});
-  }
-
-  // 2. VOLUME SPIKE 0-25pts
-  if(avg > 0 && vol > 0) {
-    const ratio = vol/avg;
-    if(ratio >= 4)      {score+=25;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — exceptional institutional interest`});}
-    else if(ratio >= 2.5){score+=20;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — strong smart-money flow`});}
-    else if(ratio >= 1.5){score+=13;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — above-normal activity`});}
-    else if(ratio >= 1.1){score+=6;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — slightly elevated`});}
-  } else if(vol >= 2e6) {
-    score+=10; signals.push({icon:'📊',text:`High volume ${fV(vol)} confirms broad participation`});
-  }
-
-  // 3. MARKET CAP 0-20pts
-  if(mc >= 100e9)      {score+=20;signals.push({icon:'🏦',text:`Mega-cap ${fC(mc)} — heavy institutional desk activity`});}
-  else if(mc >= 20e9)  {score+=17;signals.push({icon:'🏢',text:`Large-cap ${fC(mc)} — strong institutional coverage`});}
-  else if(mc >= 5e9)   {score+=13;signals.push({icon:'🏢',text:`Mid-large cap ${fC(mc)} — good liquidity for clean moves`});}
-  else if(mc >= 1e9)   {score+=8; signals.push({icon:'🏢',text:`Mid-cap ${fC(mc)} — decent institutional interest`});}
-  else if(mc >= 200e6) {score+=4;}
-
-  // 4. BETA 0-12pts
-  const beta = parseFloat(s.beta)||0;
-  if(beta >= 2.0)      {score+=12;signals.push({icon:'⚡',text:`High beta ${f1(beta)} — amplifies market moves aggressively`});}
-  else if(beta >= 1.3) {score+=9; signals.push({icon:'⚡',text:`Beta ${f1(beta)} — above-market sensitivity to momentum`});}
-  else if(beta >= 0.8) {score+=5;}
-
-  // 5. PRICE RANGE 0-8pts
-  const price = s.price;
-  if(price >= 10 && price <= 300) {score+=8;}
-  else if(price >= 5)  {score+=5;}
-  else if(price >= 1)  {score+=2;}
-
-  // 6. SECTOR BONUS 0-5pts
-  const sBonus = {'Technology':5,'Consumer Cyclical':4,'Communication Services':4,'Industrials':3,'Energy':3,'Basic Materials':2};
-  score += sBonus[s.sector]||0;
-
-  return {score:Math.min(score,100), signals};
-}
-
-// ── THESIS GENERATOR ───────────────────────────────────────────
-function buildThesis(s) {
-  const parts = [];
-  const pct = s.pct, vol = s.volume, avg = s.volAvg;
-  if(pct < 0)
-    parts.push(`${s.symbol} is down ${f2(Math.abs(pct))}% — showing weakness today but may present a reversal setup.`);
-  else if(pct >= 2 && pct <= 8)
-    parts.push(`${s.symbol} is up ${f2(pct)}% with price action squarely in the 2–8% gap zone.`);
-  else if(pct > 8)
-    parts.push(`${s.symbol} has surged ${f2(pct)}% — extended but follow-through momentum may continue.`);
-  else
-    parts.push(`${s.symbol} is up ${f2(pct)}% with early momentum building.`);
-  if(avg > 0 && vol/avg >= 2)
-    parts.push(`Volume running ${f1(vol/avg)}x the daily average signals strong conviction.`);
-  else if(vol >= 3e6)
-    parts.push(`High volume of ${fV(vol)} confirms broad market participation.`);
-  if(s.mktCap >= 10e9 && s.sector && s.sector !== 'Unknown')
-    parts.push(`As a ${fC(s.mktCap)} ${s.sector} company, institutional desks are likely behind this move.`);
-  else if(s.sector && s.sector !== 'Unknown')
-    parts.push(`Operating in ${s.sector} — benefits from current sector rotation.`);
-  return parts.join(' ');
-}
-
-// ── TARGET RANGE ───────────────────────────────────────────────
-function targetRange(pct, score) {
-  const base = Math.max(2, Math.min(pct * 0.75, 8));
-  const ext  = Math.min(base + (score/100)*3.5, 8);
-  return {min:Math.max(2,parseFloat(base.toFixed(1))), max:parseFloat(Math.min(ext,8).toFixed(1))};
-}
-
-// ── FETCH MOST-ACTIVES ─────────────────────────────────────────
-async function fetchActives() {
+// ── FETCH ACTIVES ──────────────────────────────────────
+async function fetchActives(){
   lg('GET /stable/most-actives','data');
-  const r = await fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${FMP}`);
-  if(!r.ok) throw new Error(`FMP most-actives HTTP ${r.status}`);
-  const raw = await r.json();
-  if(!Array.isArray(raw)||!raw.length) throw new Error('FMP returned empty list');
-  lg(`Fields in response: ${Object.keys(raw[0]).join(' · ')}`, 'data');
-  const list = raw.map(s=>({
-    symbol: s.symbol,
-    name:   s.name||s.companyName||s.symbol,
-    price:  parseFloat(s.price||0),
-    pct:    parseFloat(s.changesPercentage??s.changePercentage??s.percentChange??0),
-    volume: parseInt(s.volume||0),
-    mktCap: parseFloat(s.marketCap||s.mktCap||0),
+  const r=await fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${FMP}`);
+  if(!r.ok)throw new Error(`FMP HTTP ${r.status}`);
+  const raw=await r.json();
+  if(!Array.isArray(raw)||!raw.length)throw new Error('FMP returned empty');
+  lg(`Fields: ${Object.keys(raw[0]).join(' · ')}`, 'data');
+  const list=raw.map(s=>({
+    symbol:s.symbol, name:s.name||s.companyName||s.symbol,
+    price:parseFloat(s.price||0),
+    pct:parseFloat(s.changesPercentage??s.changePercentage??0),
+    volume:parseInt(s.volume||0),
+    mktCap:parseFloat(s.marketCap||s.mktCap||0),
   })).filter(s=>s.symbol&&s.price>0);
-  const sample = list[0];
-  lg(`Sample ${sample?.symbol}: price=${sample?.price} pct=${sample?.pct} vol=${sample?.volume} mktCap=${sample?.mktCap}`, 'data');
   lg(`Parsed ${list.length} stocks`, 'data', 'ok');
   return list;
 }
 
-// Fetch real-time volume for a list of symbols via /stable/quote
-async function enrichVolume(stocks) {
-  const syms = stocks.map(s=>s.symbol).join(',');
-  try {
-    // Try multiple FMP quote endpoint variants
-    let data = null;
-    const quoteUrls = [
-      `https://financialmodelingprep.com/stable/quote?symbols=${syms}&apikey=${FMP}`,
-      `https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`,
-    ];
-    for(const url of quoteUrls) {
-      try {
-        const r = await fetch(url);
-        if(!r.ok) continue;
-        const d = await r.json();
-        const arr = Array.isArray(d)?d:(d?.symbol?[d]:[]);
-        if(arr.length > 0) { data = arr; break; }
-      } catch(e) {}
-    }
-    if(!data) throw new Error('All quote endpoints returned empty');
-    const arr = data;
-    const map = {};
-    arr.forEach(q=>{ if(q?.symbol) map[q.symbol]=q; });
-    if(Object.keys(map).length === 0) {
-      lg('Quote returned 0 results — volume will show as —', 'data', 'warn');
-    } else {
-      const s0 = Object.values(map)[0];
-      lg(`Quote sample ${s0.symbol}: vol=${s0.volume} price=${s0.price} pct=${s0.changesPercentage}`, 'data', 'ok');
-    }
-    return stocks.map(s => {
-      const q = map[s.symbol];
-      if(!q) return s;
-      return {
-        ...s,
-        volume: parseInt(q.volume||q.tradingVolume||s.volume||0),
-        price:  parseFloat(q.price||s.price),
-        pct:    parseFloat(q.changesPercentage??q.changePercentage??s.pct),
-        mktCap: parseFloat(q.marketCap||q.mktCap||s.mktCap||0),
-      };
-    });
-  } catch(e) {
-    lg(`Volume fetch failed: ${e.message}`, 'data', 'warn');
-    return stocks;
-  }
-}
-
-// ── FETCH PROFILES ─────────────────────────────────────────────
-// Tries multiple FMP endpoint formats until one returns data
-async function fetchProfiles(symbols) {
-  lg(`Fetching profiles for ${symbols.length} symbols`, 'data');
-  const map = {};
-
-  // All known FMP profile endpoint variants to try
-  const batchUrls = [
+// ── FETCH PROFILES ─────────────────────────────────────
+async function fetchProfiles(symbols){
+  lg(`Profiles for ${symbols.length} symbols`, 'data');
+  const map={};
+  for(const url of [
     `https://financialmodelingprep.com/stable/profile?symbols=${symbols.join(',')}&apikey=${FMP}`,
     `https://financialmodelingprep.com/stable/profile?symbol=${symbols.join(',')}&apikey=${FMP}`,
-  ];
-
-  for(const url of batchUrls) {
-    try {
-      const r = await fetch(url);
-      if(!r.ok) continue;
-      const data = await r.json();
-      const arr = Array.isArray(data)?data:(data?.symbol?[data]:[]);
-      arr.forEach(p=>{ if(p?.symbol) map[p.symbol]=p; });
-      if(Object.keys(map).length > 0) {
-        lg(`Batch profiles OK: ${Object.keys(map).join(' ')}`, 'data', 'ok');
-        return map;
+  ]){
+    try{
+      const r=await fetch(url); if(!r.ok)continue;
+      const d=await r.json();
+      (Array.isArray(d)?d:[d]).forEach(p=>{if(p?.symbol)map[p.symbol]=p;});
+      if(Object.keys(map).length>0)break;
+    }catch(e){}
+  }
+  if(Object.keys(map).length===0){
+    lg('Batch failed — individual calls', 'data', 'warn');
+    for(const sym of symbols.slice(0,8)){
+      for(const url of [
+        `https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`,
+        `https://financialmodelingprep.com/stable/profile?symbol=${sym}&apikey=${FMP}`,
+        `https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${FMP}`,
+      ]){
+        try{
+          const r=await fetch(url); if(!r.ok)continue;
+          const d=await r.json();
+          const p=Array.isArray(d)?d[0]:d;
+          if(p?.symbol&&p?.sector){map[p.symbol]=p;break;}
+        }catch(e){}
       }
-    } catch(e){}
-  }
-
-  // Fallback: individual calls (slower but reliable)
-  lg('Batch failed — fetching individually (top 8)', 'data', 'warn');
-  for(const sym of symbols.slice(0,8)) {
-    // Try /stable/profile/SYMBOL and /stable/profile?symbol=SYMBOL
-    const urls = [
-      `https://financialmodelingprep.com/stable/profile/${sym}?apikey=${FMP}`,
-      `https://financialmodelingprep.com/stable/profile?symbol=${sym}&apikey=${FMP}`,
-      `https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${FMP}`,
-    ];
-    for(const url of urls) {
-      try {
-        const r = await fetch(url);
-        if(!r.ok) continue;
-        const data = await r.json();
-        const p = Array.isArray(data)?data[0]:data;
-        if(p?.symbol&&p?.sector) { map[p.symbol]=p; break; }
-      } catch(e){}
+      await sleep(80);
     }
-    await new Promise(r=>setTimeout(r,80));
   }
-
-  const count = Object.keys(map).length;
-  lg(`Individual profiles: ${count} loaded — ${Object.keys(map).join(' ')||'none'}`, 'data', count>0?'ok':'warn');
-
-  // If still 0 — log raw response of one symbol for debugging
-  if(count === 0) {
-    try {
-      const r = await fetch(`https://financialmodelingprep.com/stable/profile/${symbols[0]}?apikey=${FMP}`);
-      const txt = await r.text();
-      lg(`Debug raw response for ${symbols[0]}: ${txt.slice(0,120)}`, 'data', 'warn');
-    } catch(e){}
-  }
+  lg(`Profiles: ${Object.keys(map).length} loaded`, 'data', Object.keys(map).length>0?'ok':'warn');
   return map;
 }
 
-// ── FETCH NEWS ─────────────────────────────────────────────────
-// Uses FMP stock news endpoint — same API key, no CORS issues
-async function fetchNews(symbol) {
-  try {
-    const url = `https://financialmodelingprep.com/stable/news/stock?symbols=${symbol}&limit=3&apikey=${FMP}`;
-    const r = await fetch(url);
-    if(!r.ok) { lg(`News ${symbol} HTTP ${r.status}`, 'news', 'warn'); return []; }
-    const d = await r.json();
-    const articles = Array.isArray(d) ? d : [];
-    const titles = articles.slice(0,2).map(a => a.title||a.headline||'').filter(Boolean);
-    if(titles.length) lg(`${symbol}: ${titles[0].slice(0,65)}…`, 'news', 'ok');
-    else lg(`${symbol}: no news found`, 'news', 'warn');
-    return titles;
-  } catch(e) {
-    lg(`News error ${symbol}: ${e.message}`, 'news', 'warn');
-    return [];
+// ── FETCH QUOTE (real-time volume) ─────────────────────
+async function fetchQuotes(symbols){
+  const syms=symbols.join(',');
+  for(const url of [
+    `https://financialmodelingprep.com/stable/quote?symbols=${syms}&apikey=${FMP}`,
+    `https://financialmodelingprep.com/stable/quote?symbol=${syms}&apikey=${FMP}`,
+  ]){
+    try{
+      const r=await fetch(url); if(!r.ok)continue;
+      const d=await r.json();
+      const arr=Array.isArray(d)?d:[d];
+      if(arr.length>0&&arr[0]?.symbol){
+        const map={};
+        arr.forEach(q=>{if(q?.symbol)map[q.symbol]=q;});
+        const s0=Object.values(map)[0];
+        lg(`Quote sample ${s0.symbol}: vol=${s0.volume} price=${s0.price}`, 'data', 'ok');
+        return map;
+      }
+    }catch(e){}
   }
+  lg('Quote endpoint returned no data', 'data', 'warn');
+  return {};
 }
 
-// ── RENDER CARDS ───────────────────────────────────────────────
-function renderCards(picks) {
-  const grid = document.getElementById('cards');
+// ── FETCH HISTORICAL DATA (20yr) ───────────────────────
+async function fetchHistory(symbol){
+  try{
+    // Get 5 years of daily data for pattern analysis
+    const toDate = new Date().toISOString().split('T')[0];
+    const fromDate = new Date(Date.now()-5*365*24*60*60*1000).toISOString().split('T')[0];
+    const url=`https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${symbol}&from=${fromDate}&to=${toDate}&apikey=${FMP}`;
+    const r=await fetch(url);
+    if(!r.ok)return null;
+    const d=await r.json();
+    const hist=d?.historical||(Array.isArray(d)?d:[]);
+    return hist.length>0?hist:null;
+  }catch(e){return null;}
+}
+
+function analyzeHistory(hist, currentPct){
+  if(!hist||hist.length<60)return{winRate:null,avgGain:null,summary:'Insufficient history'};
+  // Find days with similar gap % (within ±2% of today's move)
+  const similar=[];
+  for(let i=1;i<hist.length-1;i++){
+    const dayPct=((hist[i].close-hist[i].open)/hist[i].open)*100;
+    if(Math.abs(dayPct-currentPct)<2){
+      // What happened the NEXT day?
+      const nextDayPct=((hist[i-1].close-hist[i-1].open)/hist[i-1].open)*100;
+      similar.push(nextDayPct);
+    }
+  }
+  if(similar.length<5)return{winRate:null,avgGain:null,summary:'Too few similar days'};
+  const wins=similar.filter(p=>p>=2&&p<=8).length;
+  const winRate=Math.round(wins/similar.length*100);
+  const avgGain=similar.reduce((a,b)=>a+b,0)/similar.length;
+  // Also check general momentum continuation
+  const upDays=similar.filter(p=>p>0).length;
+  const upRate=Math.round(upDays/similar.length*100);
+  return{
+    winRate,
+    avgGain:parseFloat(avgGain.toFixed(2)),
+    sampleSize:similar.length,
+    upRate,
+    summary:`${similar.length} similar days in 5yr: ${winRate}% hit 2-8% target next day, avg gain ${avgGain>=0?'+':''}${avgGain.toFixed(1)}%`
+  };
+}
+
+// ── FETCH NEWS (FMP) ───────────────────────────────────
+async function fetchNews(symbol){
+  try{
+    const r=await fetch(`https://financialmodelingprep.com/stable/news/stock?symbols=${symbol}&limit=3&apikey=${FMP}`);
+    if(!r.ok){lg(`News ${symbol} HTTP ${r.status}`,'news','warn');return[];}
+    const d=await r.json();
+    const articles=Array.isArray(d)?d:[];
+    const titles=articles.slice(0,2).map(a=>a.title||a.headline||'').filter(Boolean);
+    if(titles.length)lg(`${symbol}: ${titles[0].slice(0,65)}…`,'news','ok');
+    else lg(`${symbol}: no news`,'news','warn');
+    return titles;
+  }catch(e){lg(`News error ${symbol}: ${e.message}`,'news','warn');return[];}
+}
+
+// ── SCORING ────────────────────────────────────────────
+function scoreStock(s){
+  let score=0; const signals=[];
+  const pct=s.pct, vol=s.volume, avg=s.volAvg, mc=s.mktCap, beta=parseFloat(s.beta)||0;
+
+  // 1. MOMENTUM (0-28pts) — only positive movers
+  if(pct<0){score-=15;signals.push({icon:'📉',text:`Down ${f2(Math.abs(pct))}% — negative momentum`});}
+  else if(pct>=2&&pct<=8){const pts=Math.round(12+(pct-2)*2.5);score+=Math.min(pts,28);signals.push({icon:'📈',text:`Up ${f2(pct)}% — in the ideal 2–8% gap zone`});}
+  else if(pct>8&&pct<=15){score+=15;signals.push({icon:'🚀',text:`Up ${f2(pct)}% — extended, continuation possible`});}
+  else if(pct>15){score+=3;signals.push({icon:'⚠️',text:`Up ${f2(pct)}% — overextended, gap already occurred`});}
+  else if(pct>=0){score+=7;signals.push({icon:'📈',text:`Up ${f2(pct)}% — early momentum building`});}
+
+  // 2. VOLUME SPIKE (0-22pts)
+  if(avg>0&&vol>0){
+    const ratio=vol/avg;
+    if(ratio>=4){score+=22;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — exceptional smart-money flow`});}
+    else if(ratio>=2.5){score+=17;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — strong institutional activity`});}
+    else if(ratio>=1.5){score+=11;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — elevated above normal`});}
+    else if(ratio>=1.1){score+=5;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — slightly elevated`});}
+  }else if(vol>=2e6){score+=8;signals.push({icon:'📊',text:`High volume ${fV(vol)} — broad participation`});}
+
+  // 3. HISTORICAL WIN RATE (0-20pts) — key differentiator
+  if(s.histWinRate!=null){
+    if(s.histWinRate>=70){score+=20;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate on similar setups (${s.histSample} days)`});}
+    else if(s.histWinRate>=55){score+=14;signals.push({icon:'📜',text:`${s.histWinRate}% win rate on similar patterns — above average`});}
+    else if(s.histWinRate>=40){score+=8;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate — moderate`});}
+    else{score+=2;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate — below average for this setup`});}
+  }
+
+  // 4. MARKET CAP (0-15pts)
+  if(mc>=100e9){score+=15;signals.push({icon:'🏦',text:`Mega-cap ${fC(mc)} — heavy institutional coverage`});}
+  else if(mc>=20e9){score+=12;signals.push({icon:'🏢',text:`Large-cap ${fC(mc)} — strong institutional interest`});}
+  else if(mc>=5e9){score+=8;signals.push({icon:'🏢',text:`Mid-large cap ${fC(mc)} — good liquidity`});}
+  else if(mc>=1e9){score+=5;}
+
+  // 5. BETA (0-10pts)
+  if(beta>=2.0){score+=10;signals.push({icon:'⚡',text:`Beta ${f1(beta)} — high market sensitivity`});}
+  else if(beta>=1.3){score+=7;signals.push({icon:'⚡',text:`Beta ${f1(beta)} — above-market momentum amplifier`});}
+  else if(beta>=0.8){score+=4;}
+
+  // 6. SECTOR BONUS (0-5pts)
+  const sb={'Technology':5,'Consumer Cyclical':4,'Communication Services':4,'Industrials':3,'Energy':3,'Basic Materials':2};
+  score+=(sb[s.sector]||0);
+
+  return{score:Math.max(0,Math.min(score,100)),signals};
+}
+
+function buildThesis(s){
+  const parts=[];
+  if(s.pct<0)parts.push(`${s.symbol} is down ${f2(Math.abs(s.pct))}% — potential reversal setup.`);
+  else if(s.pct>=2&&s.pct<=8)parts.push(`${s.symbol} is up ${f2(s.pct)}% with price action in the 2–8% gap zone.`);
+  else if(s.pct>8)parts.push(`${s.symbol} has surged ${f2(s.pct)}% — momentum may continue.`);
+  else parts.push(`${s.symbol} is up ${f2(s.pct)}% with early momentum.`);
+  if(s.volAvg>0&&s.volume/s.volAvg>=2)parts.push(`Volume running ${f1(s.volume/s.volAvg)}x the average signals strong conviction.`);
+  if(s.histWinRate>=55)parts.push(`Historical data shows ${s.histWinRate}% success rate on similar gap setups over 5 years.`);
+  else if(s.mktCap>=10e9&&s.sector)parts.push(`As a ${fC(s.mktCap)} ${s.sector} company, institutional desks are likely driving this.`);
+  return parts.join(' ');
+}
+
+function targetRange(pct,score,histAvgGain){
+  let base=Math.max(2,Math.min(Math.abs(pct)*0.75,7));
+  if(histAvgGain&&histAvgGain>0)base=Math.max(base,Math.min(histAvgGain*0.8,7));
+  const ext=Math.min(base+(score/100)*3,8);
+  return{min:parseFloat(Math.max(2,base).toFixed(1)),max:parseFloat(Math.min(ext,8).toFixed(1))};
+}
+
+// ── RENDER CARDS ───────────────────────────────────────
+function renderCards(picks){
+  const grid=document.getElementById('cards');
   grid.innerHTML='';
   document.getElementById('results').style.display='block';
   const elapsed=((Date.now()-t0)/1000).toFixed(1);
@@ -596,175 +793,190 @@ function renderCards(picks) {
   document.getElementById('r-meta').textContent=`${picks.length} picks · ${elapsed}s · ${timeStr} EST`;
 
   picks.forEach((s,idx)=>{
-    const pctCls = s.pct>0.1?'up':s.pct<-0.1?'dn':'flat';
-    const sign   = s.pct>=0?'+':'';
-    const scCls  = sc(s.score);
-    const tgt    = targetRange(s.pct, s.score);
+    const pctCls=s.pct>0.1?'up':s.pct<-0.1?'dn':'flat';
+    const sign=s.pct>=0?'+':'';
+    const sc=scClass(s.score);
+    const tgt=targetRange(s.pct,s.score,s.histAvgGain);
 
-    const sigsHtml = s.signals.slice(0,3).map(sig=>
-      `<div class="sig-item"><span class="sig-icon">${sig.icon}</span><span>${sig.text}</span></div>`
+    const sigsHtml=s.signals.slice(0,4).map(sig=>
+      `<div class="sig-item"><span>${sig.icon}</span><span>${sig.text}</span></div>`
     ).join('');
 
-    const newsHtml = s.headlines?.length
-      ? `<div class="news-block"><div class="news-lbl">Latest News</div>${s.headlines.map(h=>`<div class="news-item">${h}</div>`).join('')}</div>`
-      : '';
+    const newsHtml=s.headlines?.length
+      ?`<div class="news-block"><div class="news-lbl">Latest News</div>${s.headlines.map(h=>`<div class="news-item">${h}</div>`).join('')}</div>`:'';
 
-    const sectorTag = s.sector&&s.sector!=='Unknown'
-      ? `<span class="tag tag-sector">${s.sector}</span>` : '';
+    const histHtml=s.histWinRate!=null
+      ?`<div class="hist-block"><div class="hist-lbl">Historical Analysis (5yr)</div><div class="hist-stat">${s.histSummary}</div></div>`:'';
 
-    const card = document.createElement('div');
+    const card=document.createElement('div');
     card.className='card';
     card.innerHTML=`
       <div class="card-num">${String(idx+1).padStart(2,'0')}</div>
       <div class="c-ticker">${s.symbol}</div>
       <div class="c-name">${s.name}</div>
       <div class="c-tags">
-        ${sectorTag}
-        <span class="tag tag-${scCls}">Score ${s.score}/100</span>
+        ${s.sector&&s.sector!=='Unknown'?`<span class="tag tag-sector">${s.sector}</span>`:''}
+        <span class="tag tag-${sc}">Score ${s.score}/100</span>
+        ${s.histWinRate!=null?`<span class="tag" style="background:rgba(152,120,240,.09);color:var(--violet);border:1px solid rgba(152,120,240,.16);">${s.histWinRate}% hist</span>`:''}
       </div>
       <div class="price-row">
-        <div>
-          <div class="pr-price">$${f2(s.price)}</div>
-          <div class="pr-chg ${pctCls}">${sign}${f2(s.pct)}% today</div>
-        </div>
-        <div class="pr-right">
-          <div class="pr-tgt-lbl">Gap Target</div>
-          <div class="pr-tgt-val">+${tgt.min}% → +${tgt.max}%</div>
-        </div>
+        <div><div class="pr-price">$${f2(s.price)}</div><div class="pr-chg ${pctCls}">${sign}${f2(s.pct)}% today</div></div>
+        <div class="pr-right"><div class="pr-tgt-lbl">Gap Target</div><div class="pr-tgt-val">+${tgt.min}%→+${tgt.max}%</div></div>
       </div>
       <p class="thesis">${s.thesis}</p>
       <div class="sig-lbl">Why this pick</div>
       ${sigsHtml}
+      ${histHtml}
       ${newsHtml}
       <div class="stats-row">
-        <div class="stat"><div class="sv">${fV(s.volume)||"—"}</div><div class="sl">Vol Today</div></div>
+        <div class="stat"><div class="sv">${fV(s.volume)}</div><div class="sl">Vol Today</div></div>
         <div class="stat"><div class="sv">${fV(s.volAvg)}</div><div class="sl">Avg Vol</div></div>
         <div class="stat"><div class="sv">${fC(s.mktCap)}</div><div class="sl">Mkt Cap</div></div>
         <div class="stat"><div class="sv">${s.beta?f1(s.beta):'—'}</div><div class="sl">Beta</div></div>
       </div>
       <div class="score-row">
         <span class="score-lbl">Gap Score</span>
-        <div class="score-track"><div class="score-fill sf-${scCls}" style="width:${s.score}%"></div></div>
+        <div class="score-track"><div class="score-fill sf-${sc}" style="width:${s.score}%"></div></div>
         <span class="score-val">${s.score}/100</span>
       </div>`;
     grid.appendChild(card);
   });
 }
 
-// ── MAIN SCAN ──────────────────────────────────────────────────
-async function runScan() {
+// ── MAIN SCAN ──────────────────────────────────────────
+async function runScan(){
   const btn=document.getElementById('scan-btn');
   btn.disabled=true; t0=Date.now();
   document.getElementById('err-panel').style.display='none';
   document.getElementById('results').style.display='none';
   document.getElementById('log-body').innerHTML='';
   ['s1','s2','s3','s4','s5'].forEach(id=>stepState(id,'idle'));
-  prog(4); status('Starting scan…',true);
-  lg('─────────────────────────────');
+  prog(4); status('Starting…',true);
+  lg('─────────────────────────────────────');
   lg(`Scan · ${new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York'})} EST`);
 
+  const minPct=parseFloat(document.getElementById('minPct').value)||0;
+  const minPrice=parseFloat(document.getElementById('minPrice').value)||5;
+  const today=new Date().toISOString().split('T')[0];
+  const {ok:dbOk}=getSB();
 
-  const minPct   = parseFloat(document.getElementById('minPct').value)||0;
-  const minPrice = parseFloat(document.getElementById('minPrice').value)||1;
-
-  try {
+  try{
     // STEP 1 — actives
-    stepState('s1','active'); status('Fetching live market data…',true); prog(10);
-    const allStocks = await fetchActives();
-    stepState('s1','done'); prog(22);
+    stepState('s1','active'); status('Fetching live market data…',true); prog(8);
+    const allStocks=await fetchActives();
+    stepState('s1','done'); prog(18);
 
-    // Quick pre-filter by symbol/name before profile fetch
-    // Cast wider net — include all non-ETF stocks regardless of % move
-    // Sector filter will narrow this down after profiles load
-    const preCandidates = allStocks.filter(s =>
-      !SKIP_SYM.has(s.symbol) &&
-      !SKIP_NAME.test(s.name||'') &&
-      s.price >= minPrice
-    ).slice(0, 40);
-    // Also track which ones meet the % filter for priority scoring
-    const pctFiltered = preCandidates.filter(s => s.pct >= minPct);
-    lg(`Pre-filter: ${preCandidates.length} total candidates (${pctFiltered.length} meet ≥${minPct}% threshold) → ${preCandidates.map(s=>s.symbol).join(' ')}`, 'data');
+    const preCandidates=allStocks.filter(s=>
+      !SKIP_SYM.has(s.symbol)&&!SKIP_NAME.test(s.name||'')&&s.price>=minPrice
+    ).slice(0,40);
+    lg(`Pre-filter: ${preCandidates.length} candidates`, 'data');
+    if(!preCandidates.length)throw new Error('No candidates after filter. Try lowering min price.');
 
+    // STEP 2 — profiles + volume
+    stepState('s2','active'); status('Loading profiles…',true); prog(28);
+    const [profiles, quotes]=await Promise.all([
+      fetchProfiles(preCandidates.slice(0,20).map(s=>s.symbol)),
+      fetchQuotes(preCandidates.slice(0,20).map(s=>s.symbol)),
+    ]);
+    stepState('s2','done'); prog(40);
 
-    if(preCandidates.length === 0) throw new Error(`No stocks passed pre-filter. Try lowering Min % or Min Price in settings. (${allStocks.length} stocks total, top mover: ${allStocks[0]?.symbol} ${f2(allStocks[0]?.pct)}%)`);
-
-    // STEP 2 — profiles + sector filter
-    stepState('s2','active'); status('Loading company profiles…',true); prog(34);
-    const profiles = await fetchProfiles(preCandidates.slice(0,20).map(s=>s.symbol));
-    stepState('s2','done'); prog(50);
-
-    // Enrich and apply sector filter
-    const enrichedRaw = preCandidates.slice(0,20).map(s => {
-      const p = profiles[s.symbol]||{};
-      return {
+    // Enrich
+    const enrichedRaw=preCandidates.slice(0,20).map(s=>{
+      const p=profiles[s.symbol]||{};
+      const q=quotes[s.symbol]||{};
+      return{
         ...s,
-        name:     p.companyName||p.name||s.name,
-        sector:   p.sector||'',
-        industry: p.industry||'',
-        mktCap:   parseFloat(s.mktCap||p.mktCap||p.marketCap||0),
-        volAvg:   parseFloat(p.volAvg||p.averageVolume||p.avgVolume||0),
-        beta:     parseFloat(p.beta||0)||null,
+        name:p.companyName||p.name||s.name,
+        sector:p.sector||'',
+        industry:p.industry||'',
+        mktCap:parseFloat(s.mktCap||p.mktCap||q.marketCap||0),
+        volAvg:parseFloat(p.volAvg||p.averageVolume||0),
+        beta:parseFloat(p.beta||0)||null,
+        volume:parseInt(q.volume||s.volume||0),
+        price:parseFloat(q.price||s.price),
+        pct:parseFloat(q.changesPercentage??q.changePercentage??s.pct),
       };
     });
-    const enriched = filterWithLog(enrichedRaw);
+    const enriched=enrichedRaw.filter(s=>isRealStock(s)&&s.pct>=minPct);
+    const toScore=enriched.length>=3?enriched:enrichedRaw.filter(s=>s.pct>=0).slice(0,15);
+    lg(`After filter: ${enriched.length} real stocks to score`, 'data', enriched.length>0?'ok':'warn');
 
-    lg(`After sector filter: ${enriched.length} stocks — ${enriched.map(s=>`${s.symbol}(${s.sector||'?'})`).join(' ')}`, 'data', enriched.length>0?'ok':'warn');
+    // STEP 3 — historical analysis
+    stepState('s3','active'); status('Analyzing 5yr historical patterns…',true); prog(50);
+    const topCandidates=toScore.sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)).slice(0,10);
+    lg(`Fetching 5yr history for top ${topCandidates.length} candidates…`, 'data');
+    for(const s of topCandidates){
+      const hist=await fetchHistory(s.symbol);
+      if(hist){
+        const analysis=analyzeHistory(hist,s.pct);
+        s.histWinRate=analysis.winRate;
+        s.histAvgGain=analysis.avgGain;
+        s.histSample=analysis.sampleSize;
+        s.histSummary=analysis.summary;
+        if(analysis.winRate!=null)lg(`${s.symbol}: ${analysis.winRate}% hist win rate (${analysis.sampleSize} similar days)`, 'data', analysis.winRate>=55?'ok':'warn');
+      }
+      await sleep(100);
+    }
+    stepState('s3','done'); prog(65);
 
-    // If profiles didn't load, fall back to pre-candidates (can't do sector filter)
-    const toScore = enriched.length > 0 ? enriched : preCandidates.slice(0,15).map(s=>({...s,sector:'',industry:'',volAvg:0,beta:null}));
-    if(enriched.length === 0) lg('No sector data — skipping sector filter, scoring by momentum + volume', 'data', 'warn');
-
-    // Enrich volume data from /stable/quote
-    lg('Fetching real-time volume + price data…', 'data');
-    const toScoreRaw = toScore.length > 0 ? await enrichVolume(toScore) : toScore;
-
-    // STEP 3 — score and rank
-    stepState('s3','active'); status('Scoring candidates…',true); prog(63);
-    const scored = toScoreRaw.map(s => {
-      const {score,signals} = scoreStock(s);
-      return {...s, score, signals, thesis: buildThesis(s)};
+    // STEP 4 — score and rank
+    stepState('s4','active'); status('Scoring & ranking…',true); prog(72);
+    const scored=toScore.map(s=>{
+      const{score,signals}=scoreStock(s);
+      return{...s,score,signals,thesis:buildThesis(s)};
     }).sort((a,b)=>b.score-a.score);
 
-    // Prefer positive movers — sort negatives to bottom
-    const top5 = scored.filter(s => s.pct >= 0).slice(0,5);
-    if(top5.length < 5) {
-      // If not enough positive stocks, add best negatives to fill
-      const neg = scored.filter(s => s.pct < 0);
-      while(top5.length < 5 && neg.length) top5.push(neg.shift());
-    }
-    top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | +${f2(s.pct)}% | Vol ${fV(s.volume)} | ${s.sector||'sector?'}`, 'score', i===0?'ok':''));
-    stepState('s3','done'); prog(75);
+    const top5=scored.filter(s=>s.pct>=0).slice(0,5);
+    if(top5.length<5){const neg=scored.filter(s=>s.pct<0);while(top5.length<5&&neg.length)top5.push(neg.shift());}
+    top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | ${f2(s.pct)}% | WinRate ${s.histWinRate!=null?s.histWinRate+'%':'—'} | ${s.sector||'—'}`, 'score', i===0?'ok':''));
+    stepState('s4','done'); prog(82);
 
-    // STEP 4 — news via FMP (no extra key needed)
-    stepState('s4','active'); prog(82);
-    status('Fetching live news headlines…',true);
-    lg(`Fetching news for: ${top5.map(s=>s.symbol).join(', ')}`, 'news');
-    for(const s of top5) {
-      s.headlines = await fetchNews(s.symbol);
-      await new Promise(r=>setTimeout(r,200));
+    // STEP 5 — news + save
+    stepState('s5','active'); status('Fetching news…',true); prog(88);
+    for(const s of top5){
+      s.headlines=await fetchNews(s.symbol);
+      s.targetMin=targetRange(s.pct,s.score,s.histAvgGain).min;
+      s.targetMax=targetRange(s.pct,s.score,s.histAvgGain).max;
+      await sleep(150);
     }
-    stepState('s4','done'); prog(90);
 
-    // STEP 5 — render
-    stepState('s5','active'); status('Building report…',true);
-    renderCards(top5);
+    // Save to DB
+    if(dbOk){
+      try{
+        await ensureTable();
+        await savePredictions(top5,today);
+        lg(`✓ Predictions saved to database for ${today}`, 'db', 'ok');
+      }catch(e){
+        lg(`DB save failed: ${e.message} — predictions NOT saved`, 'db', 'err');
+        lg('To enable: set up Supabase (see README in history tab)', 'db');
+      }
+    }else{
+      lg('No DB configured — predictions not saved (add Supabase keys in settings)', 'db', 'warn');
+    }
     stepState('s5','done'); prog(100);
 
+    renderCards(top5);
     const elapsed=((Date.now()-t0)/1000).toFixed(1);
     status(`Done in ${elapsed}s`,false);
     lg(`Complete in ${elapsed}s`, 'ok', 'ok');
     setTimeout(()=>prog(0),2500);
 
-  } catch(err) {
-    ['s1','s2','s3','s4','s5'].forEach(id=>{ if(document.getElementById(id).classList.contains('active')) stepState(id,'idle'); });
+  }catch(err){
+    ['s1','s2','s3','s4','s5'].forEach(id=>{if(document.getElementById(id).classList.contains('active'))stepState(id,'idle');});
     lg('Failed: '+err.message,'err','err');
     document.getElementById('err-panel').style.display='block';
     document.getElementById('err-msg').textContent=err.message;
     status('Scan failed',false); prog(0);
-  } finally {
-    btn.disabled=false;
-  }
+  }finally{btn.disabled=false;}
 }
+
+// Pre-fill saved credentials
+window.onload=()=>{
+  const u=localStorage.getItem('sbUrl')||'https://nxnkbuvsxkebjjbtupzb.supabase.co';
+  const k=localStorage.getItem('sbKey')||'sb_publishable_pjS6AadK1g1ljGoHAgFOqg_IawAhBa_';
+  document.getElementById('sbUrl').value=u;
+  document.getElementById('sbKey').value=k;
+};
 </script>
 </body>
 </html>
