@@ -227,14 +227,7 @@ td.flat{color:var(--mid);}
             <option value="20">$20+</option>
           </select>
         </div>
-        <div class="s-row">
-          <div class="s-label">Supabase URL</div>
-          <input class="s-input" id="sbUrl" placeholder="https://xxx.supabase.co" />
-        </div>
-        <div class="s-row">
-          <div class="s-label">Supabase Anon Key</div>
-          <input class="s-input" id="sbKey" placeholder="eyJ…" type="password" />
-        </div>
+        <!-- DB credentials hardcoded — not shown in UI -->
         <button class="scan-btn" id="scan-btn" onclick="runScan()">◈ &nbsp;Run Scan</button>
         <div class="s-status" id="status-text">Ready</div>
         <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
@@ -281,7 +274,7 @@ td.flat{color:var(--mid);}
 
     <div class="err-panel" id="hist-err-panel">
       <div class="err-label">⚠ Database not connected</div>
-      <div class="err-msg" id="hist-err-msg">Add your Supabase URL and Key in the Scan tab settings to enable history tracking.</div>
+      <div class="err-msg" id="hist-err-msg">Database connection failed. Please check your Supabase configuration.</div>
     </div>
 
     <div class="table-wrap">
@@ -329,13 +322,12 @@ td.flat{color:var(--mid);}
 const FMP = '0FllcdQ6BbsCTI1UfhILMH2elYIvPx5A';
 let logVisible = true, t0 = 0;
 
-// ── DB helpers ──────────────────────────────────────────
+// ── DB config (hardcoded — not exposed in UI) ───────────
+const SB_URL = 'https://nxnkbuvsxkebjjbtupzb.supabase.co';
+const SB_KEY = 'sb_publishable_pjS6AadK1g1ljGoHAgFOqg_IawAhBa_';
+
 function getSB() {
-  const url = document.getElementById('sbUrl').value.trim() || localStorage.getItem('sbUrl') || '';
-  const key = document.getElementById('sbKey').value.trim() || localStorage.getItem('sbKey') || '';
-  if(url) localStorage.setItem('sbUrl', url);
-  if(key) localStorage.setItem('sbKey', key);
-  return { url, key, ok: !!(url && key) };
+  return { url: SB_URL, key: SB_KEY, ok: true };
 }
 
 async function dbQuery(path, method='GET', body=null) {
@@ -1072,14 +1064,15 @@ async function runScan(){
       // Market is broadly down today — show warning instead of bad picks
       lg('⚠ No positive movers found — market may be broadly down today', 'score', 'warn');
       document.getElementById('results').style.display='block';
-      document.getElementById('cards').innerHTML = `
-        <div style="grid-column:1/-1;padding:48px;text-align:center;color:var(--mid);">
-          <div style="font-family:var(--serif);font-size:22px;margin-bottom:12px;color:var(--pale);">No Gap Candidates Today</div>
-          <div style="font-size:11px;line-height:1.8;max-width:480px;margin:0 auto;">
-            The market appears broadly down today. This tool identifies <em>upward</em> gap setups only.<br>
-            Check back during a positive market session or after a catalyst event.
-          </div>
-        </div>`;
+      const noGapDiv = document.createElement('div');
+      noGapDiv.style.cssText = 'grid-column:1/-1;padding:48px;text-align:center;color:var(--mid)';
+      noGapDiv.innerHTML = '<div style="font-family:var(--serif);font-size:22px;margin-bottom:12px;color:var(--pale)">No Gap Candidates Today</div>'
+        + '<div style="font-size:11px;line-height:1.8;max-width:480px;margin:0 auto">'
+        + 'The market appears broadly down today. This tool identifies upward gap setups only.'
+        + ' Check back during a positive market session or after a catalyst event.'
+        + '</div>';
+      document.getElementById('cards').innerHTML = '';
+      document.getElementById('cards').appendChild(noGapDiv);
       stepState('s4','done'); stepState('s5','done'); prog(100);
       status('No upward gap candidates today', false);
       setTimeout(()=>prog(0), 2000);
@@ -1132,13 +1125,7 @@ async function runScan(){
   }finally{btn.disabled=false;}
 }
 
-// Pre-fill saved credentials
-window.onload=()=>{
-  const u=localStorage.getItem('sbUrl')||'https://nxnkbuvsxkebjjbtupzb.supabase.co';
-  const k=localStorage.getItem('sbKey')||'sb_publishable_pjS6AadK1g1ljGoHAgFOqg_IawAhBa_';
-  document.getElementById('sbUrl').value=u;
-  document.getElementById('sbKey').value=k;
-};
+// DB credentials are hardcoded — no UI setup needed
 </script>
 </body>
 </html>
