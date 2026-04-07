@@ -930,46 +930,63 @@ async function runScan(){
 
     // STEP 2 — profiles + volume
     stepState('s2','active'); status('Loading profiles…',true); prog(28);
+    // Fetch profiles for ALL 40 candidates (parallel — fast)
+    const allSymbols = preCandidates.map(s=>s.symbol);
     const [profiles, quotes]=await Promise.all([
-      fetchProfiles(preCandidates.slice(0,20).map(s=>s.symbol)),
-      fetchQuotes(preCandidates.slice(0,20).map(s=>s.symbol)),
+      fetchProfiles(allSymbols.slice(0,30)),
+      fetchQuotes(allSymbols.slice(0,30)),
     ]);
     stepState('s2','done'); prog(40);
 
-    // Enrich
-    const enrichedRaw=preCandidates.slice(0,20).map(s=>{
+    // Enrich ALL pre-candidates with profile data
+    const enrichedRaw = preCandidates.map(s=>{
       const p=profiles[s.symbol]||{};
       const q=quotes[s.symbol]||{};
       return{
         ...s,
-        name:p.companyName||p.name||s.name,
-        sector:p.sector||'',
-        industry:p.industry||'',
-        mktCap:parseFloat(s.mktCap||p.mktCap||q.marketCap||0),
-        volAvg:parseFloat(p.volAvg||p.averageVolume||0),
-        beta:parseFloat(p.beta||0)||null,
-        volume:parseInt(q.volume||s.volume||0),
-        price:parseFloat(q.price||s.price),
-        pct:parseFloat(q.changesPercentage??q.changePercentage??s.pct),
+        name:   p.companyName||p.name||s.name,
+        sector: p.sector||'',
+        industry: p.industry||'',
+        mktCap: parseFloat(s.mktCap||p.mktCap||q.marketCap||0),
+        volAvg: parseFloat(p.volAvg||p.averageVolume||0),
+        beta:   parseFloat(p.beta||0)||null,
+        volume: parseInt(q.volume||s.volume||0),
+        price:  parseFloat(q.price||s.price),
+        pct:    parseFloat(q.changesPercentage??q.changePercentage??s.pct),
       };
     });
-    const enriched=enrichedRaw.filter(s=>isRealStock(s)&&s.pct>=minPct);
-    // If too few candidates, progressively relax filters
+
+    lg(`Enriched ${enrichedRaw.length} stocks total`, 'data');
+
+    // Apply real-stock filter (removes ETFs, crypto, excluded sectors)
+    const realStocks = enrichedRaw.filter(s => isRealStock(s));
+    lg(`Real stocks after exclusion filter: ${realStocks.length} — ${realStocks.map(s=>s.symbol).join(' ')}`, 'data', realStocks.length>0?'ok':'warn');
+
+    // Progressive pct filter — always guarantee at least 8 candidates to score
     let toScore;
-    if(enriched.length>=3){
-      toScore=enriched;
-    } else if(enrichedRaw.filter(s=>isRealStock(s)&&s.pct>=0).length>=3){
-      toScore=enrichedRaw.filter(s=>isRealStock(s)&&s.pct>=0);
-      lg(`Relaxed pct filter — using all positive movers (${toScore.length})`, 'data','warn');
+    const positiveMoverMin = realStocks.filter(s=>s.pct>=minPct);
+    const positiveMovers   = realStocks.filter(s=>s.pct>=0);
+
+    if(positiveMoverMin.length >= 5){
+      toScore = positiveMoverMin;
+      lg(`Using ${toScore.length} stocks matching ≥${minPct}% filter`, 'data', 'ok');
+    } else if(positiveMovers.length >= 5){
+      toScore = positiveMovers;
+      lg(`Relaxed to all positive movers: ${toScore.length} stocks`, 'data', 'warn');
+    } else if(realStocks.length >= 3){
+      toScore = realStocks;
+      lg(`Using all ${toScore.length} real stocks (market may be slow today)`, 'data', 'warn');
     } else {
-      toScore=enrichedRaw.filter(s=>isRealStock(s)).slice(0,15);
-      lg(`Minimal filter — using all real stocks (${toScore.length})`, 'data','warn');
+      // Last resort: use all pre-candidates ignoring sector filter
+      toScore = enrichedRaw.filter(s=>!SKIP_SYM.has(s.symbol)&&!SKIP_NAME.test(s.name||''));
+      lg(`Last resort: ${toScore.length} candidates (sector filter bypassed)`, 'data', 'warn');
     }
-    lg(`Scoring ${toScore.length} stocks`, 'data', toScore.length>0?'ok':'warn');
+    lg(`Scoring ${toScore.length} candidates`, 'data', toScore.length>0?'ok':'err');
 
     // STEP 3 — historical analysis
     stepState('s3','active'); status('Analyzing 5yr historical patterns…',true); prog(50);
-    const topCandidates=toScore.sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)).slice(0,10);
+    // Sort a copy so we don't mutate toScore
+    const topCandidates=[...toScore].sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)).slice(0,10);
     lg(`Fetching 5yr history for top ${topCandidates.length} candidates…`, 'data');
     for(const s of topCandidates){
       const hist=await fetchHistory(s.symbol);
@@ -992,8 +1009,12 @@ async function runScan(){
       return{...s,score,signals,thesis:buildThesis(s)};
     }).sort((a,b)=>b.score-a.score);
 
-    const top5=scored.filter(s=>s.pct>=0).slice(0,5);
-    if(top5.length<5){const neg=scored.filter(s=>s.pct<0);while(top5.length<5&&neg.length)top5.push(neg.shift());}
+    // Always return 5 — prefer positive movers but fill with best available
+    const positives = scored.filter(s=>s.pct>=0);
+    const negatives = scored.filter(s=>s.pct<0);
+    const top5 = [...positives.slice(0,5)];
+    while(top5.length < 5 && negatives.length) top5.push(negatives.shift());
+    lg(`Final top ${top5.length} picks selected`, 'score', 'ok');
     top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | ${f2(s.pct)}% | WinRate ${s.histWinRate!=null?s.histWinRate+'%':'—'} | ${s.sector||'—'}`, 'score', i===0?'ok':''));
     stepState('s4','done'); prog(82);
 
