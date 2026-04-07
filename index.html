@@ -567,8 +567,32 @@ function scClass(n){return n>=70?'a':n>=45?'b':'c';}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 // ── EXCLUSIONS ─────────────────────────────────────────
-const SKIP_SYM = new Set(['SPY','QQQ','IWM','DIA','MDY','VTI','VOO','IVV','GLD','SLV','USO','UNG','TLT','IEF','SHY','HYG','LQD','AGG','BND','JNK','EEM','EFA','FXI','EWJ','EWZ','VWO','VXX','UVXY','SVXY','VIXY','TQQQ','SQQQ','SPXL','SPXS','UDOW','SDOW','TNA','TZA','LABU','LABD','SOXL','SOXS','FNGU','FNGD','BULZ','BERZ','WEBL','WEBS','TSLL','TSLS','TSLQ','NVDL','NVDD','NVD','TSDD','CONL','COIG','COIA','NBIG','NBIL','MSTU','MSTD','SPDN','BITO','IBIT','GBTC','ETHE','XLF','XLE','XLK','XLV','XLI','XLB','XLP','XLU','XLY','XLRE','GDX','GDXJ','SLX','KRE','KBE','IAT','IYF','IBB','XBI']);
-const SKIP_NAME=/\b(2x|3x|ultra|short|inverse|daily|leveraged|bear etf|bull etf|proshares|direxion|graniteShares|wisdomtree fund|ishares etf|vanguard etf|spdr)\b/i;
+const SKIP_SYM = new Set([
+  // Index ETFs
+  'SPY','QQQ','IWM','DIA','MDY','VTI','VOO','IVV',
+  // Commodity ETFs
+  'GLD','SLV','USO','UNG','PDBC','DBO','GSG',
+  // Bond ETFs
+  'TLT','IEF','SHY','HYG','LQD','AGG','BND','JNK','VCIT','VCSH',
+  // International ETFs
+  'EEM','EFA','FXI','EWJ','EWZ','VWO','IEMG','ACWI',
+  // Volatility
+  'VXX','UVXY','SVXY','VIXY',
+  // Leveraged/Inverse
+  'TQQQ','SQQQ','SPXL','SPXS','UDOW','SDOW','TNA','TZA','LABU','LABD',
+  'SOXL','SOXS','FNGU','FNGD','BULZ','BERZ','WEBL','WEBS',
+  'TSLL','TSLS','TSLQ','NVDL','NVDD','NVD','TSDD',
+  'CONL','COIG','COIA','NBIG','NBIL','MSTU','MSTD','SPDN',
+  // Crypto ETFs & miners
+  'BITO','IBIT','GBTC','ETHE','MARA','RIOT','CLSK','CIFR','IREN',
+  'BTBT','HUT','WULF','CORZ','MIGI','SATO','BTDR',
+  // Sector ETFs
+  'XLF','XLE','XLK','XLV','XLI','XLB','XLP','XLU','XLY','XLRE',
+  'GDX','GDXJ','SLX','KRE','KBE','IAT','IYF','IBB','XBI',
+  'ARKK','ARKG','ARKF','ARKW','ARKQ',
+]);"
+
+const SKIP_NAME=/\b(2x|3x|ultra|short|inverse|daily etf|leveraged|bear etf|bull etf|proshares|direxion|graniteShares|wisdomtree|ishares|vanguard etf|spdr|bitcoin miner|crypto miner|digital holdings|immersion tech)\b/i;
 const EXCL_SECTORS=new Set(['Financial Services','Real Estate','Utilities']);
 const EXCL_IND=new Set(['Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic','Pharmaceutical Retailers','Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty','Insurance—Diversified','Capital Markets','Asset Management','Mortgage Finance','Credit Services']);
 
@@ -577,6 +601,10 @@ function isRealStock(s){
   if(SKIP_NAME.test(s.name||''))return false;
   if(s.sector&&EXCL_SECTORS.has(s.sector))return false;
   if(s.industry&&EXCL_IND.has(s.industry))return false;
+  // Exclude micro-caps (under $300M) — too illiquid for reliable gap plays
+  if(s.mktCap>0 && s.mktCap < 300e6)return false;
+  // Exclude extremely overextended stocks (>25% already moved — gap is done)
+  if(s.pct > 25)return false;
   return true;
 }
 
@@ -604,6 +632,7 @@ async function fetchProfiles(symbols){
   lg(`Profiles for ${symbols.length} symbols`, 'data');
   const map={};
   for(const url of [
+    `https://financialmodelingprep.com/api/v3/profile/${symbols[0]}?apikey=${FMP}`,
     `https://financialmodelingprep.com/stable/profile?symbols=${symbols.join(',')}&apikey=${FMP}`,
     `https://financialmodelingprep.com/stable/profile?symbol=${symbols.join(',')}&apikey=${FMP}`,
   ]){
@@ -790,7 +819,11 @@ function renderCards(picks){
   document.getElementById('results').style.display='block';
   const elapsed=((Date.now()-t0)/1000).toFixed(1);
   const timeStr=new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
-  document.getElementById('r-meta').textContent=`${picks.length} picks · ${elapsed}s · ${timeStr} EST`;
+  const estNow=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const hm=estNow.getHours()*60+estNow.getMinutes();
+    const isMarketHours=(estNow.getDay()>=1&&estNow.getDay()<=5&&hm>=570&&hm<960);
+    const mktNote=isMarketHours?'':' · ⚠ After-hours — run again at market open for best results';
+    document.getElementById('r-meta').textContent=`${picks.length} picks · ${elapsed}s · ${timeStr} EST${mktNote}`;
 
   picks.forEach((s,idx)=>{
     const pctCls=s.pct>0.1?'up':s.pct<-0.1?'dn':'flat';
