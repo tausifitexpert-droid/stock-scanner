@@ -316,6 +316,28 @@ td.flat{color:var(--mid);}
 <div class="foot">Apex · Not financial advice · Educational purposes only</div>
 
 <script>
+// Global error handler - shows any silent JS crash visibly
+window.onerror = function(msg, src, line, col, err){
+  const panel = document.getElementById('err-panel');
+  const msgEl = document.getElementById('err-msg');
+  if(panel && msgEl){
+    panel.style.display='block';
+    msgEl.textContent = 'JS Error: ' + msg + ' (line ' + line + ')';
+  }
+  console.error('JS Error:', msg, 'line:', line, err);
+  const btn = document.getElementById('scan-btn');
+  if(btn) btn.disabled = false;
+  return false;
+};
+window.onunhandledrejection = function(e){
+  const panel = document.getElementById('err-panel');
+  const msgEl = document.getElementById('err-msg');
+  if(panel && msgEl){
+    panel.style.display='block';
+    msgEl.textContent = 'Unhandled error: ' + (e.reason?.message || e.reason || 'Unknown');
+  }
+  console.error('Unhandled rejection:', e.reason);
+};
 // ════════════════════════════════════════════════════════
 // CONFIG
 // ════════════════════════════════════════════════════════
@@ -548,9 +570,9 @@ function lg(msg,phase='',type=''){
   document.getElementById('log-cnt').textContent=`(${b.querySelectorAll('.lr').length})`;
 }
 function toggleLog(){logVisible=!logVisible;document.getElementById('log-body').style.display=logVisible?'block':'none';document.getElementById('log-btn').textContent=logVisible?'▲ collapse':'▼ expand';}
-function prog(p){document.getElementById('prog').style.width=p+'%';}
-function status(msg,live=false){const e=document.getElementById('status-text');e.textContent=msg;e.className='s-status'+(live?' live':'');}
-function stepState(id,s){document.getElementById(id).className='step'+(s==='active'?' active':s==='done'?' done':'');}
+function prog(p){const el=document.getElementById('prog');if(el)el.style.width=p+'%';}
+function status(msg,live=false){const e=document.getElementById('status-text');if(e){e.textContent=msg;e.className='s-status'+(live?' live':'');}}
+function stepState(id,s){const el=document.getElementById(id);if(el)el.className='step'+(s==='active'?' active':s==='done'?' done':'');}
 const f2=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(2);
 const f1=v=>isNaN(parseFloat(v))?'—':parseFloat(v).toFixed(1);
 function fV(v){if(!v||parseInt(v)<=0)return'—';const n=parseInt(v);if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return String(n);}
@@ -943,6 +965,7 @@ function renderCards(picks){
 // ── MAIN SCAN ──────────────────────────────────────────
 async function runScan(){
   const btn=document.getElementById('scan-btn');
+  if(!btn){ console.error('scan-btn not found'); return; }
   btn.disabled=true; t0=Date.now();
   document.getElementById('err-panel').style.display='none';
   document.getElementById('results').style.display='none';
