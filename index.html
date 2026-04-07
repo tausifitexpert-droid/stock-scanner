@@ -593,8 +593,16 @@ const SKIP_SYM = new Set([
 ]);
 
 const SKIP_NAME=/\b(2x|3x|ultra|short|inverse|daily etf|leveraged|bear etf|bull etf|proshares|direxion|graniteShares|wisdomtree|ishares|vanguard etf|spdr|bitcoin miner|crypto miner|digital holdings|immersion tech)\b/i;
-const EXCL_SECTORS=new Set(['Financial Services','Real Estate','Utilities']);
-const EXCL_IND=new Set(['Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic','Pharmaceutical Retailers','Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty','Insurance—Diversified','Capital Markets','Asset Management','Mortgage Finance','Credit Services']);
+const EXCL_SECTORS=new Set([
+  'Financial Services','Real Estate','Utilities','Healthcare'
+]);
+const EXCL_IND=new Set([
+  'Biotechnology','Drug Manufacturers—General','Drug Manufacturers—Specialty & Generic',
+  'Pharmaceutical Retailers','Medical Devices','Medical Instruments & Supplies',
+  'Diagnostics & Research','Health Information Services','Medical Distribution',
+  'Banks—Regional','Banks—Diversified','Insurance—Life','Insurance—Property & Casualty',
+  'Insurance—Diversified','Capital Markets','Asset Management','Mortgage Finance','Credit Services'
+]);
 
 function isRealStock(s){
   if(SKIP_SYM.has(s.symbol))return false;
@@ -768,28 +776,75 @@ function scoreStock(s){
   let score=0; const signals=[];
   const pct=s.pct, vol=s.volume, avg=s.volAvg, mc=s.mktCap, beta=parseFloat(s.beta)||0;
 
-  // 1. MOMENTUM (0-28pts) — only positive movers
-  if(pct<0){score-=15;signals.push({icon:'📉',text:`Down ${f2(Math.abs(pct))}% — negative momentum`});}
-  else if(pct>=2&&pct<=8){const pts=Math.round(12+(pct-2)*2.5);score+=Math.min(pts,28);signals.push({icon:'📈',text:`Up ${f2(pct)}% — in the ideal 2–8% gap zone`});}
-  else if(pct>8&&pct<=15){score+=15;signals.push({icon:'🚀',text:`Up ${f2(pct)}% — extended, continuation possible`});}
-  else if(pct>15){score+=3;signals.push({icon:'⚠️',text:`Up ${f2(pct)}% — overextended, gap already occurred`});}
-  else if(pct>=0){score+=7;signals.push({icon:'📈',text:`Up ${f2(pct)}% — early momentum building`});}
+  // 1. MOMENTUM (0-30pts)
+  if(pct < 0){
+    score -= 20; // Hard penalty — should never appear in results
+    signals.push({icon:'📉', text:`Down ${f2(Math.abs(pct))}% — not a gap candidate`});
+  } else if(pct >= 2 && pct <= 8){
+    const pts = Math.round(14 + (pct-2)*2.5);
+    score += Math.min(pts, 30);
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — squarely in the 2–8% target zone`});
+  } else if(pct > 8 && pct <= 15){
+    score += 16;
+    signals.push({icon:'🚀', text:`Up ${f2(pct)}% — extended but continuation possible`});
+  } else if(pct > 15){
+    score += 4;
+    signals.push({icon:'⚠️', text:`Up ${f2(pct)}% — overextended, gap risk elevated`});
+  } else if(pct >= 1){
+    score += 9;
+    signals.push({icon:'📈', text:`Up ${f2(pct)}% — building momentum`});
+  } else {
+    score += 3; // 0-1% barely counts
+    signals.push({icon:'📊', text:`Up ${f2(pct)}% — minimal move, watch for catalyst`});
+  }
 
-  // 2. VOLUME SPIKE (0-22pts)
-  if(avg>0&&vol>0){
-    const ratio=vol/avg;
-    if(ratio>=4){score+=22;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — exceptional smart-money flow`});}
-    else if(ratio>=2.5){score+=17;signals.push({icon:'🔥',text:`Volume ${f1(ratio)}x avg — strong institutional activity`});}
-    else if(ratio>=1.5){score+=11;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — elevated above normal`});}
-    else if(ratio>=1.1){score+=5;signals.push({icon:'📊',text:`Volume ${f1(ratio)}x avg — slightly elevated`});}
-  }else if(vol>=2e6){score+=8;signals.push({icon:'📊',text:`High volume ${fV(vol)} — broad participation`});}
+  // 2. VOLUME SPIKE (0-22pts) — institutional activity indicator
+  if(avg > 0 && vol > 0){
+    const ratio = vol/avg;
+    if(ratio >= 4){
+      score += 22;
+      signals.push({icon:'🔥', text:`Volume ${f1(ratio)}x avg — exceptional institutional conviction`});
+    } else if(ratio >= 2.5){
+      score += 17;
+      signals.push({icon:'🔥', text:`Volume ${f1(ratio)}x avg — strong smart money flow`});
+    } else if(ratio >= 1.5){
+      score += 11;
+      signals.push({icon:'📊', text:`Volume ${f1(ratio)}x avg — elevated above normal`});
+    } else if(ratio >= 1.1){
+      score += 5;
+      signals.push({icon:'📊', text:`Volume ${f1(ratio)}x avg — slightly elevated`});
+    } else {
+      score += 2; // Below average volume = weak conviction
+      signals.push({icon:'📊', text:`Volume ${f1(ratio)}x avg — below-average conviction`});
+    }
+  } else if(vol >= 5e6){
+    score += 10;
+    signals.push({icon:'📊', text:`High absolute volume ${fV(vol)} — broad participation`});
+  } else if(vol >= 1e6){
+    score += 5;
+    signals.push({icon:'📊', text:`Volume ${fV(vol)} — moderate activity`});
+  }
 
-  // 3. HISTORICAL WIN RATE (0-20pts) — key differentiator
-  if(s.histWinRate!=null){
-    if(s.histWinRate>=70){score+=20;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate on similar setups (${s.histSample} days)`});}
-    else if(s.histWinRate>=55){score+=14;signals.push({icon:'📜',text:`${s.histWinRate}% win rate on similar patterns — above average`});}
-    else if(s.histWinRate>=40){score+=8;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate — moderate`});}
-    else{score+=2;signals.push({icon:'📜',text:`${s.histWinRate}% historical win rate — below average for this setup`});}
+  // 3. HISTORICAL WIN RATE (0-25pts) — strongest predictive signal
+  if(s.histWinRate != null){
+    if(s.histWinRate >= 65){
+      score += 25;
+      signals.push({icon:'📜', text:`${s.histWinRate}% historical win rate — strong edge (${s.histSample} similar days)`});
+    } else if(s.histWinRate >= 50){
+      score += 18;
+      signals.push({icon:'📜', text:`${s.histWinRate}% win rate — above average setup`});
+    } else if(s.histWinRate >= 35){
+      score += 10;
+      signals.push({icon:'📜', text:`${s.histWinRate}% historical win rate — moderate edge`});
+    } else {
+      score += 2;
+      signals.push({icon:'⚠️', text:`Only ${s.histWinRate}% historical win rate — weak setup historically`});
+    }
+    // Bonus if avg historical gain is strong
+    if(s.histAvgGain >= 3){
+      score += 5;
+      signals.push({icon:'📊', text:`Avg gain ${f2(s.histAvgGain)}% on similar days — strong follow-through`});
+    }
   }
 
   // 4. MARKET CAP (0-15pts)
@@ -1009,12 +1064,32 @@ async function runScan(){
       return{...s,score,signals,thesis:buildThesis(s)};
     }).sort((a,b)=>b.score-a.score);
 
-    // Always return 5 — prefer positive movers but fill with best available
-    const positives = scored.filter(s=>s.pct>=0);
-    const negatives = scored.filter(s=>s.pct<0);
-    const top5 = [...positives.slice(0,5)];
-    while(top5.length < 5 && negatives.length) top5.push(negatives.shift());
-    lg(`Final top ${top5.length} picks selected`, 'score', 'ok');
+    // STRICT: Only positive movers qualify as gap candidates
+    const positives = scored.filter(s => s.pct > 0);
+    const top5 = positives.slice(0, 5);
+    
+    if(top5.length === 0){
+      // Market is broadly down today — show warning instead of bad picks
+      lg('⚠ No positive movers found — market may be broadly down today', 'score', 'warn');
+      document.getElementById('results').style.display='block';
+      document.getElementById('cards').innerHTML = `
+        <div style="grid-column:1/-1;padding:48px;text-align:center;color:var(--mid);">
+          <div style="font-family:var(--serif);font-size:22px;margin-bottom:12px;color:var(--pale);">No Gap Candidates Today</div>
+          <div style="font-size:11px;line-height:1.8;max-width:480px;margin:0 auto;">
+            The market appears broadly down today. This tool identifies <em>upward</em> gap setups only.<br>
+            Check back during a positive market session or after a catalyst event.
+          </div>
+        </div>`;
+      stepState('s4','done'); stepState('s5','done'); prog(100);
+      status('No upward gap candidates today', false);
+      setTimeout(()=>prog(0), 2000);
+      return;
+    }
+    
+    if(top5.length < 5){
+      lg(\`Only \${top5.length} positive movers qualify today — showing best available\`, 'score', 'warn');
+    }
+    lg(`Final top ${top5.length} picks: ${top5.map(s=>s.symbol).join(', ')}`, 'score', 'ok');
     top5.forEach((s,i)=>lg(`#${i+1} ${s.symbol} | Score ${s.score}/100 | ${f2(s.pct)}% | WinRate ${s.histWinRate!=null?s.histWinRate+'%':'—'} | ${s.sector||'—'}`, 'score', i===0?'ok':''));
     stepState('s4','done'); prog(82);
 
