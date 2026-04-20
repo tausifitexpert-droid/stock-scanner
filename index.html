@@ -649,7 +649,7 @@ function lg(msg,phase,type) {
   var ts=p(now.getHours())+':'+p(now.getMinutes())+':'+p(now.getSeconds());
   var el=document.createElement('div'); el.className='lr';
   var ph=phase?'<span class="lp '+phase+'">'+phase+'</span>':'';
-  el.innerHTML='<span class="lt">'+ts+'</span>'+ph+'<span class="lm '+(type||'")>'+msg+'</span>';
+  el.innerHTML='<span class="lt">'+ts+'</span>'+ph+'<span class="lm '+(type||'')+'">'  +msg+'</span>';
   var body=document.getElementById('log-body');
   if(body){body.appendChild(el);body.scrollTop=body.scrollHeight;}
   var cnt=document.getElementById('log-cnt');
