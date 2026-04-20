@@ -518,20 +518,129 @@ function scClass(n) { return n>=65?'a':n>=40?'b':'c'; }
 // ═══════════════════════════════════════════════════
 var logVisible=true, t0=0;
 
-function tick() {
-  var est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  var p=function(n){return String(n).padStart(2,'0');};
-  var el=document.getElementById('clock');
-  if(el) el.textContent=p(est.getHours())+':'+p(est.getMinutes())+':'+p(est.getSeconds())+' EST';
-  var b=document.getElementById('mkt-badge');
-  if(!b) return;
-  var d=est.getDay(),hm=est.getHours()*60+est.getMinutes();
-  if(d===0||d===6){b.className='pill pill-closed';b.textContent='Weekend';}
-  else if(hm<570){b.className='pill pill-pre';b.textContent='Pre-Market';}
-  else if(hm<960){b.className='pill pill-open';b.textContent='LIVE';}
-  else{b.className='pill pill-closed';b.textContent='After-Hours';}
+// ═══════════════════════════════════════════════════
+// MARKET STATUS — checks FMP for real open/closed
+// including bank holidays. Refreshes every 5 minutes.
+// ═══════════════════════════════════════════════════
+var mktStatus = {
+  checked: false, isOpen: false,
+  isHoliday: false, holidayName: '', label: 'Checking...'
+};
+
+async function checkMarketStatus() {
+  var today = new Date().toISOString().split('T')[0];
+  try {
+    // 1. Exchange market hours — returns isMarketOpen + holiday flag
+    var r1 = await fetch('https://financialmodelingprep.com/stable/exchange-market-hours?exchange=NASDAQ&apikey=' + FMP);
+    if (r1.ok) {
+      var d1 = await r1.json();
+      var info = Array.isArray(d1) ? d1[0] : d1;
+      if (info) {
+        mktStatus.isOpen    = !!(info.isMarketOpen || info.isOpen);
+        mktStatus.isHoliday = !!(info.isHoliday || info.holiday);
+        mktStatus.holidayName = info.holidayName || info.holiday || '';
+      }
+    }
+    // 2. Holiday calendar — cross-check today's date explicitly
+    if (!mktStatus.isHoliday) {
+      var r2 = await fetch('https://financialmodelingprep.com/stable/holidays-by-exchange?exchange=NASDAQ&apikey=' + FMP);
+      if (r2.ok) {
+        var holidays = await r2.json();
+        var arr = Array.isArray(holidays) ? holidays : [];
+        var h = arr.find(function(x) { return x.date === today || x.holidayDate === today; });
+        if (h) {
+          mktStatus.isHoliday   = true;
+          mktStatus.holidayName = h.holidayName || h.name || 'Market Holiday';
+        }
+      }
+    }
+  } catch(e) {
+    lg('Market status API error: ' + e.message + ' — using time fallback', 'mkt', 'warn');
+  }
+  // Time-based fallback / supplement
+  var est = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var wd = est.getDay(), hm = est.getHours() * 60 + est.getMinutes();
+  if (wd === 0 || wd === 6) { mktStatus.isHoliday = false; mktStatus.isOpen = false; mktStatus.label = 'Weekend'; }
+  else if (mktStatus.isHoliday) { mktStatus.isOpen = false; mktStatus.label = 'HOLIDAY: ' + mktStatus.holidayName; }
+  else if (hm < 570)  { mktStatus.label = 'Pre-Market'; }
+  else if (hm < 960)  { mktStatus.label = mktStatus.isOpen ? 'LIVE' : 'Open (unconfirmed)'; mktStatus.isOpen = true; }
+  else                { mktStatus.isOpen = false; mktStatus.label = 'After-Hours'; }
+  mktStatus.checked = true;
+  updateMarketBadge();
+  lg('Market: ' + mktStatus.label + (mktStatus.isHoliday ? ' (' + mktStatus.holidayName + ')' : ''), 'mkt', mktStatus.isOpen ? 'ok' : 'warn');
+  return mktStatus;
 }
-setInterval(tick,1000); tick();
+
+function updateMarketBadge() {
+  var b = document.getElementById('mkt-badge');
+  if (!b) return;
+  if (!mktStatus.checked)       { b.className = 'pill pill-neutral'; b.textContent = 'Checking...'; return; }
+  if (mktStatus.isHoliday)      { b.className = 'pill pill-closed';  b.textContent = mktStatus.label; return; }
+  var est = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var wd = est.getDay(), hm = est.getHours() * 60 + est.getMinutes();
+  if (wd === 0 || wd === 6)     { b.className = 'pill pill-closed';  b.textContent = 'Weekend'; }
+  else if (mktStatus.isOpen)    { b.className = 'pill pill-open';    b.textContent = 'LIVE'; }
+  else if (hm < 570)            { b.className = 'pill pill-pre';     b.textContent = 'Pre-Market'; }
+  else if (hm >= 960)           { b.className = 'pill pill-closed';  b.textContent = 'After-Hours'; }
+  else                          { b.className = 'pill pill-closed';  b.textContent = 'Closed'; }
+}
+
+// Clock tick — purely cosmetic, separate from market status
+function tick() {
+  var est = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var p = function(n) { return String(n).padStart(2, '0'); };
+  var el = document.getElementById('clock');
+  if (el) el.textContent = p(est.getHours()) + ':' + p(est.getMinutes()) + ':' + p(est.getSeconds()) + ' EST';
+  updateMarketBadge();
+}
+setInterval(tick, 1000); tick();
+
+// Check market status on load, then refresh every 5 minutes
+checkMarketStatus();
+setInterval(function() { checkMarketStatus(); }, 5 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════
+// AUTO EOD SCHEDULER
+// Runs verification at 4:01 PM EST — weekdays only
+// Skips if market was closed (holiday/weekend)
+// Page must be open. Checks every 60 seconds.
+// ═══════════════════════════════════════════════════
+var eodAutoRan = localStorage.getItem('eodAutoRan') || '';
+
+function checkAutoEOD() {
+  var est     = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var wd      = est.getDay();
+  var hm      = est.getHours() * 60 + est.getMinutes();
+  var dateStr = est.toISOString().split('T')[0];
+
+  if (wd === 0 || wd === 6) return;           // skip weekends
+  if (hm < 961 || hm > 1005) return;          // 4:01 PM - 4:45 PM only
+  if (eodAutoRan === dateStr) return;          // already ran today
+
+  // KEY CHECK: skip if market was closed today (bank holiday)
+  if (mktStatus.checked && mktStatus.isHoliday) {
+    lg('AUTO EOD: Skipping — market closed today (' + mktStatus.holidayName + ')', 'db', 'warn');
+    eodAutoRan = dateStr;
+    localStorage.setItem('eodAutoRan', dateStr);
+    return;
+  }
+
+  eodAutoRan = dateStr;
+  localStorage.setItem('eodAutoRan', dateStr);
+  var h = est.getHours(), m = String(est.getMinutes()).padStart(2, '0');
+  lg('AUTO EOD: Running verification for ' + dateStr + ' at ' + h + ':' + m + ' EST', 'db', 'ok');
+  runEODVerification(true).then(function() {
+    lg('AUTO EOD complete for ' + dateStr + ' — check History tab', 'db', 'ok');
+    var hp = document.getElementById('tab-history');
+    if (hp && hp.classList.contains('active')) loadHistory();
+  }).catch(function(e) {
+    lg('AUTO EOD error: ' + e.message, 'db', 'err');
+    eodAutoRan = '';
+    localStorage.removeItem('eodAutoRan');
+  });
+}
+setInterval(checkAutoEOD, 60000);
+setTimeout(checkAutoEOD, 3000);
 
 function lg(msg,phase,type) {
   var wrap=document.getElementById('log-wrap');
@@ -645,9 +754,17 @@ function renderHistory(rows) {
 }
 
 // EOD verification — fetch actual close price for today's picks
-async function runEODVerification() {
+async function runEODVerification(silent) {
   var btn=document.getElementById('eod-btn');
-  if(btn){btn.textContent='Verifying...';btn.disabled=true;}
+  // Block on holidays — no trades = no data to verify
+  if (mktStatus.checked && mktStatus.isHoliday) {
+    var msg = 'Market was closed today (' + mktStatus.holidayName + ') — no trades to verify.';
+    if (!silent) { showError(msg); lg(msg, 'db', 'warn'); }
+    else lg('EOD skipped: holiday — ' + mktStatus.holidayName, 'db', 'warn');
+    return;
+  }
+  if (!silent && btn) { btn.textContent = 'Verifying...'; btn.disabled = true; }
+  if (!silent) lg('Manual EOD verification triggered', 'db');
   var today=new Date().toISOString().split('T')[0];
   lg('EOD Verification for '+today+'...','db');
   try{
@@ -687,7 +804,7 @@ async function runEODVerification() {
     lg('Today success rate: '+rate+'%','db',rate>=60?'ok':'warn');
     await loadHistory();
   }catch(e){lg('EOD verification failed: '+e.message,'db','err');}
-  finally{if(btn){btn.textContent='Verify Today\'s Results (4PM+)';btn.disabled=false;}}
+  finally{if(!silent&&btn){btn.textContent='Verify Today\'s Results (4PM+)';btn.disabled=false;}}
 }
 
 // Past pending verification
@@ -1053,6 +1170,24 @@ async function runScan() {
   lg('=========================================');
   lg('APEX v3 Scan · '+new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' EST');
 
+  // HOLIDAY / WEEKEND GATE — block scan on non-trading days
+  if (mktStatus.checked) {
+    var est2 = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+    var wd2  = est2.getDay();
+    if (wd2 === 0 || wd2 === 6) {
+      showError('Market is closed — today is a weekend. Scans only work Monday-Friday during market hours.');
+      setStatus('Weekend — market closed', false);
+      if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+      return;
+    }
+    if (mktStatus.isHoliday) {
+      showError('Market closed today: ' + mktStatus.holidayName + '. No trading data available — scan skipped to avoid corrupt results.');
+      setStatus('Market holiday: ' + mktStatus.holidayName, false);
+      lg('SCAN BLOCKED: Market holiday — ' + mktStatus.holidayName, 'mkt', 'warn');
+      if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+      return;
+    }
+  }
   var minPct=parseFloat((document.getElementById('minPct')||{value:'1'}).value)||0;
   var minPrice=parseFloat((document.getElementById('minPrice')||{value:'5'}).value)||5;
   var minCap=parseFloat((document.getElementById('minCap')||{value:'500000000'}).value)||0;
