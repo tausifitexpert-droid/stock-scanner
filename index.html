@@ -407,6 +407,7 @@ td.up{color:var(--green);font-weight:600;}td.dn{color:var(--red);font-weight:600
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="eod-btn" id="eod-btn" onclick="runEODVerification()">Verify Today's Results (4PM+)</button>
         <button class="eod-btn" onclick="runVerification()">Verify Past Pending</button>
+        <button class="eod-btn" onclick="reVerifyAll()" style="border-color:var(--violet);color:var(--violet)">Re-Verify All Results</button>
       </div>
     </div>
 
@@ -689,18 +690,32 @@ async function dbQuery(path,method,body) {
 }
 
 async function saveToDb(picks,dateStr,marketCtx) {
-  var rows=picks.map(function(s){
+  // Deduplicate — skip symbols already saved for today
+  var existing = [];
+  try {
+    var ex = await dbQuery('apex_predictions?date=eq.'+dateStr+'&select=symbol');
+    existing = (ex||[]).map(function(r){ return r.symbol; });
+    if (existing.length) lg('Already saved today: '+existing.join(', ')+' — skipping duplicates','db','warn');
+  } catch(e) {}
+
+  var newPicks = picks.filter(function(s){ return existing.indexOf(s.symbol) === -1; });
+  if (!newPicks.length) { lg('All picks already saved for '+dateStr+' — no duplicates added','db','warn'); return; }
+
+  var rows = newPicks.map(function(s){
     return{
       date:dateStr, symbol:s.symbol, company:s.name, sector:s.sector||'',
       score:s.score, target_min:s.targetMin, target_max:s.targetMax,
-      open_price:s.price, close_price:null, actual_pct:null, verdict:'pending',
-      price_at_scan:s.price, pct_at_scan:s.pct,
+      // open_price left NULL — will be filled at EOD with actual 9:30 AM open from FMP
+      // open_price = actual 9:30 AM open saved NOW so EOD has it ready
+      open_price:  s.openPrice || null,
+      close_price: null, actual_pct: null, verdict: 'pending',
+      price_at_scan: s.price, pct_at_scan: s.pct,
       hist_win_rate:s.histWinRate||null, hist_avg_gain:s.histAvgGain||null,
       thesis:s.thesis, created_at:new Date().toISOString()
     };
   });
   await dbQuery('apex_predictions','POST',rows);
-  lg('Saved '+rows.length+' picks to DB for '+dateStr,'db','ok');
+  lg('Saved '+rows.length+' new picks for '+dateStr+' (skipped '+( picks.length-rows.length)+' duplicates)','db','ok');
 }
 
 async function loadHistory() {
@@ -767,45 +782,140 @@ async function runEODVerification(silent) {
   if (!silent && btn) { btn.textContent = 'Verifying...'; btn.disabled = true; }
   if (!silent) lg('Manual EOD verification triggered', 'db');
   var today=new Date().toISOString().split('T')[0];
-  lg('EOD Verification for '+today+'...','db');
+  lg('EOD Verification for '+today+' — fetching actual open/close prices...','db');
   try{
-    var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=eq.'+today+'&select=id,symbol,date,target_min,target_max,open_price');
+    var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=eq.'+today+'&select=id,symbol,date,target_min,target_max,price_at_scan,pct_at_scan');
     if(!pending||!pending.length){lg('No pending picks for today','db','warn');return;}
-    lg('Verifying '+pending.length+' picks for today...','db');
+    lg('Verifying '+pending.length+' picks using actual market open/close data...','db');
     var hits=0,misses=0,partials=0;
     for(var i=0;i<pending.length;i++){
       var pred=pending[i];
       try{
-        // Fetch today's intraday data to get current/close price
-        var url='https://financialmodelingprep.com/stable/quote?symbol='+pred.symbol+'&apikey='+FMP;
-        var r=await fetch(url);
-        if(!r.ok) continue;
-        var data=await r.json();
-        var q=Array.isArray(data)?data[0]:data;
-        if(!q||!q.price) continue;
-        var closePrice=parseFloat(q.price);
-        var openPrice=parseFloat(pred.open_price||q.open||0);
-        if(!openPrice) continue;
-        var actualPct=((closePrice-openPrice)/openPrice)*100;
-        var verdict=actualPct>=pred.target_min&&actualPct<=pred.target_max?'hit':actualPct>=2?'partial':'miss';
+        // PRIMARY: stable/quote — available same day immediately after market close
+        // q.open  = actual 9:30 AM exchange open price
+        // q.price = last traded price (= close price after 4 PM EST)
+        // q.previousClose = yesterday's close (for reference)
+        var actualOpen = null, actualClose = null;
+        var quoteUrl = 'https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP;
+        var qr = await fetch(quoteUrl);
+        if (qr.ok) {
+          var qd = await qr.json();
+          var q  = Array.isArray(qd) ? qd[0] : qd;
+          if (q && q.open && q.price) {
+            actualOpen  = parseFloat(q.open);   // real 9:30 AM open
+            actualClose = parseFloat(q.price);  // current/close price
+            lg(pred.symbol + ' quote: open=$' + f2(actualOpen) + ' close=$' + f2(actualClose) + ' prevClose=$' + f2(q.previousClose), 'db');
+          }
+        }
+
+        // FALLBACK: if we already have open_price saved from scan time, use it
+        if (!actualOpen && pred.open_price) {
+          actualOpen = parseFloat(pred.open_price);
+          lg(pred.symbol + ': using saved open_price=$' + f2(actualOpen), 'db', 'warn');
+        }
+
+        // FALLBACK 2: historical EOD (available next morning for past dates)
+        if (!actualOpen || !actualClose) {
+          var histUrl = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=' + pred.symbol + '&from=' + today + '&to=' + today + '&apikey=' + FMP;
+          var hr = await fetch(histUrl);
+          if (hr.ok) {
+            var hd = await hr.json();
+            var hist = hd.historical || (Array.isArray(hd) ? hd : []);
+            var day  = hist.find(function(x) { return x.date === today; }) || hist[0];
+            if (day) {
+              actualOpen  = parseFloat(day.open);
+              actualClose = parseFloat(day.close);
+              lg(pred.symbol + ': using historical EOD — open=$' + f2(actualOpen) + ' close=$' + f2(actualClose), 'db');
+            }
+          }
+        }
+
+        if(!actualOpen || !actualClose){
+          lg(pred.symbol+': Could not get open/close data — skipping','db','warn');
+          continue;
+        }
+
+        // Step 3: Calculate actual % gain from REAL market open to close
+        var actualPct=((actualClose - actualOpen) / actualOpen) * 100;
+
+        // Step 4: Verdict — did stock achieve target range during the day?
+        var verdict;
+        if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
+        else if(actualPct >= pred.target_min * 0.5) verdict='partial'; // got at least halfway there
+        else if(actualPct >= 1.5) verdict='partial'; // meaningful positive move
+        else verdict='miss';
+
         if(verdict==='hit') hits++;
         else if(verdict==='partial') partials++;
         else misses++;
+
         await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
-          close_price:parseFloat(closePrice.toFixed(2)),
-          actual_pct:parseFloat(actualPct.toFixed(2)),
-          verdict:verdict
+          open_price: parseFloat(actualOpen.toFixed(2)),
+          close_price:parseFloat(actualClose.toFixed(2)),
+          actual_pct: parseFloat(actualPct.toFixed(2)),
+          verdict:    verdict
         });
-        lg(pred.symbol+': open=$'+f2(openPrice)+' now=$'+f2(closePrice)+' actual='+pctSign(actualPct)+' -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol+': actual open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' gain='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
-      await sleep(150);
+      await sleep(200);
     }
-    lg('EOD Results: '+hits+' hits, '+partials+' partial, '+misses+' misses out of '+pending.length,'db','ok');
+    lg('EOD Results: '+hits+' hits, '+partials+' partial, '+misses+' misses / '+pending.length+' total','db','ok');
     var rate=pending.length?Math.round((hits+partials*0.5)/pending.length*100):0;
-    lg('Today success rate: '+rate+'%','db',rate>=60?'ok':'warn');
+    lg('Today success rate: '+rate+'% '+(rate>=70?'EXCELLENT':rate>=50?'GOOD':'NEEDS IMPROVEMENT'),'db',rate>=60?'ok':'warn');
     await loadHistory();
   }catch(e){lg('EOD verification failed: '+e.message,'db','err');}
   finally{if(!silent&&btn){btn.textContent='Verify Today\'s Results (4PM+)';btn.disabled=false;}}
+}
+
+// Re-verify ALL records — fixes wrong verdicts from scan-price bug
+async function reVerifyAll() {
+  if (!confirm('This will re-fetch actual open/close prices for ALL saved picks and recalculate verdicts. This fixes any wrong results. Continue?')) return;
+  var btn = document.querySelector('[onclick="reVerifyAll()"]');
+  if (btn) { btn.textContent = 'Re-verifying...'; btn.disabled = true; }
+  lg('RE-VERIFY ALL: Fetching actual open/close for every saved pick...', 'db', 'ok');
+  try {
+    // Fetch ALL records regardless of verdict
+    var all = await dbQuery('apex_predictions?order=date.desc&limit=500&select=id,symbol,date,target_min,target_max');
+    if (!all || !all.length) { lg('No records found', 'db', 'warn'); return; }
+    lg('Re-verifying '+all.length+' total records...', 'db');
+    var hits=0, partials=0, misses=0, skipped=0;
+    for (var i=0; i<all.length; i++) {
+      var pred = all[i];
+      try {
+        var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
+        var r = await fetch(url); if (!r.ok) { skipped++; continue; }
+        var data = await r.json();
+        var hist = data.historical||(Array.isArray(data)?data:[]);
+        var day = hist.find(function(x){return x.date===pred.date;})||hist[0];
+        if (!day) { skipped++; continue; }
+        var actualOpen  = parseFloat(day.open);
+        var actualClose = parseFloat(day.close);
+        var actualPct   = ((actualClose - actualOpen) / actualOpen) * 100;
+        var verdict;
+        if (actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
+        else if (actualPct >= pred.target_min * 0.5) verdict='partial';
+        else if (actualPct >= 1.5) verdict='partial';
+        else verdict='miss';
+        if (verdict==='hit') hits++;
+        else if (verdict==='partial') partials++;
+        else misses++;
+        await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {
+          open_price:  parseFloat(actualOpen.toFixed(2)),
+          close_price: parseFloat(actualClose.toFixed(2)),
+          actual_pct:  parseFloat(actualPct.toFixed(2)),
+          verdict:     verdict
+        });
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' -> '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+      } catch(e) { lg('Error '+pred.symbol+': '+e.message, 'db', 'err'); skipped++; }
+      await sleep(250);
+    }
+    var total = hits+partials+misses;
+    var rate = total ? Math.round((hits+partials*0.5)/total*100) : 0;
+    lg('RE-VERIFY COMPLETE: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' skipped','db','ok');
+    lg('Overall success rate: '+rate+'%','db',rate>=60?'ok':'warn');
+    await loadHistory();
+  } catch(e) { lg('Re-verify failed: '+e.message, 'db', 'err'); }
+  finally { if (btn) { btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
 }
 
 // Past pending verification
@@ -822,14 +932,25 @@ async function runVerification() {
         var r=await fetch(url); if(!r.ok) continue;
         var data=await r.json();
         var hist=data.historical||(Array.isArray(data)?data:[]);
-        var day=hist[0]; if(!day) continue;
-        var actualPct=((parseFloat(day.close)-parseFloat(day.open))/parseFloat(day.open))*100;
-        var verdict=actualPct>=pred.target_min&&actualPct<=pred.target_max?'hit':actualPct>=2?'partial':'miss';
+        // Match exact date or take first result
+        var day=hist.find(function(x){return x.date===pred.date;})||hist[0];
+        if(!day) continue;
+        // Use actual market open (9:30 AM) — not our scan price
+        var actualOpen  = parseFloat(day.open);
+        var actualClose = parseFloat(day.close);
+        var actualPct   = ((actualClose - actualOpen) / actualOpen) * 100;
+        var verdict;
+        if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
+        else if(actualPct >= pred.target_min * 0.5) verdict='partial';
+        else if(actualPct >= 1.5) verdict='partial';
+        else verdict='miss';
         await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
-          open_price:parseFloat(day.open), close_price:parseFloat(day.close),
-          actual_pct:parseFloat(actualPct.toFixed(2)), verdict:verdict
+          open_price:parseFloat(actualOpen.toFixed(2)),
+          close_price:parseFloat(actualClose.toFixed(2)),
+          actual_pct:parseFloat(actualPct.toFixed(2)),
+          verdict:verdict
         });
-        lg(pred.symbol+' '+pred.date+': '+pctSign(actualPct)+' -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':'');
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
       await sleep(150);
     }
@@ -912,6 +1033,35 @@ async function fetchProfiles(symbols) {
   if(count>0){
     var sp=Object.values(map)[0];
     lg('Sample '+sp.symbol+': exchange='+sp.exchangeShortName+' mktCap='+fC(sp.mktCap||sp.marketCap)+' volAvg='+fV(sp.volAvg||sp.averageVolume)+' sector='+sp.sector,'data');
+  }
+  return map;
+}
+
+// Fetch live quotes for top candidates
+// Returns: q.open (9:30 open), q.price (live), q.previousClose, q.volume
+async function fetchQuotes(symbols) {
+  lg('Fetching live quotes for ' + symbols.length + ' candidates...', 'data');
+  var map = {};
+  var fetches = symbols.map(function(sym) {
+    return fetch('https://financialmodelingprep.com/stable/quote?symbol=' + sym + '&apikey=' + FMP)
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        if (!d) return null;
+        var q = Array.isArray(d) ? d[0] : d;
+        return (q && q.symbol) ? q : null;
+      })
+      .catch(function() { return null; });
+  });
+  var results = await Promise.allSettled(fetches);
+  results.forEach(function(r) {
+    if (r.status === 'fulfilled' && r.value && r.value.symbol) map[r.value.symbol] = r.value;
+  });
+  var count = Object.keys(map).length;
+  lg('Quotes: ' + count + '/' + symbols.length + ' loaded', 'data', count > 0 ? 'ok' : 'warn');
+  if (count > 0) {
+    var s0 = Object.values(map)[0];
+    lg('Quote fields: ' + Object.keys(s0).slice(0,14).join(', '), 'data');
+    lg('Sample ' + s0.symbol + ': open=$' + f2(s0.open) + ' price=$' + f2(s0.price) + ' prevClose=$' + f2(s0.previousClose) + ' volume=' + fV(s0.volume), 'data');
   }
   return map;
 }
@@ -1225,10 +1375,16 @@ async function runScan() {
     setStep('s2','done'); setProgress(30);
 
     // Pre-filter
-    var preCands=allStocks.filter(function(s){
-      return !SKIP_SYM.has(s.symbol)&&!SKIP_NAME.test(s.name||'')&&s.price>=minPrice&&s.pct>0;
-    }).slice(0,50);
-    lg('Pre-filter (positive movers, non-ETF): '+preCands.length+' candidates — '+preCands.map(function(s){return s.symbol;}).join(' '),'data');
+    // Pre-filter: remove obvious ETFs/leveraged by name/symbol only
+    // Exchange filter applied AFTER profile load (exchangeShortName is reliable there)
+    var preCands = allStocks.filter(function(s) {
+      if (SKIP_SYM.has(s.symbol)) return false;
+      if (SKIP_NAME.test(s.name || '')) return false;
+      if (s.price < minPrice) return false;
+      if (s.pct <= 0) return false;
+      return true;
+    }).slice(0, 50);
+    lg('Pre-filter (positive, non-ETF): ' + preCands.length + ' candidates — ' + preCands.map(function(s){return s.symbol;}).join(' '), 'data');
 
     // STEP 3: Profiles + volume
     setStep('s3','active'); setStatus('Loading live profiles + volume...',true); setProgress(38);
@@ -1236,23 +1392,59 @@ async function runScan() {
     setProgress(46);
 
     // Enrich
-    var enriched=preCands.map(function(s){
-      var p=profiles[s.symbol]||{};
-      return{
-        symbol:s.symbol, name:p.companyName||p.name||s.name,
-        price:s.price, pct:s.pct,
-        volume:parseInt(s.volume||p.volume||0),
-        mktCap:parseFloat(p.mktCap||p.marketCap||p.marketCapitalization||s.mktCap||0),
-        volAvg:parseFloat(p.volAvg||p.averageVolume||p.avgVolume||0),
-        beta:parseFloat(p.beta||0)||null,
-        sector:p.sector||'', industry:p.industry||'',
-        exchange:p.exchangeShortName||s.exchange||p.exchange||''
+    // Fetch live quotes for top 20 candidates
+    // Gives us: q.open (9:30 AM open), q.previousClose, q.volume (live)
+    var topSymbols = preCands.slice(0,20).map(function(s){return s.symbol;});
+    var quotes = await fetchQuotes(topSymbols);
+
+    var enriched = preCands.map(function(s) {
+      var p = profiles[s.symbol] || {};
+      var q = quotes[s.symbol]   || {};
+
+      // TRUE gap % = (current price - yesterday's close) / yesterday's close
+      // This is the real pre-market/opening gap, not intraday movement
+      var prevClose  = parseFloat(q.previousClose || 0);
+      var livePrice  = parseFloat(q.price || s.price || 0);
+      var openPrice  = parseFloat(q.open  || 0);  // actual 9:30 AM open
+      var trueGapPct = prevClose > 0
+        ? ((livePrice - prevClose) / prevClose) * 100
+        : s.pct; // fallback to most-actives pct
+
+      // Volume: prefer live quote volume (most current), fallback to most-actives
+      var liveVol = parseInt(q.volume || s.volume || 0);
+      var avgVol  = parseFloat(p.volAvg || p.averageVolume || p.avgVolume || 0);
+
+      return {
+        symbol:    s.symbol,
+        name:      p.companyName || p.name || s.name,
+        price:     livePrice || s.price,
+        openPrice: openPrice,        // 9:30 AM open — saved to DB immediately
+        prevClose: prevClose,        // yesterday's close
+        pct:       parseFloat(trueGapPct.toFixed(2)), // TRUE gap from prev close
+        pctAtScan: s.pct,            // raw most-actives pct (kept for reference)
+        volume:    liveVol,
+        volAvg:    avgVol,
+        mktCap:    parseFloat(p.mktCap || p.marketCap || p.marketCapitalization || s.mktCap || 0),
+        beta:      parseFloat(p.beta || 0) || null,
+        sector:    p.sector   || '',
+        industry:  p.industry || '',
+        exchange:  p.exchangeShortName || p.exchange || s.exchange || ''
       };
+    });
+
+    // Log true gap vs scan-time pct for top 5
+    enriched.slice(0,5).forEach(function(s) {
+      lg(s.symbol + ': prevClose=$' + f2(s.prevClose) + ' open=$' + f2(s.openPrice) + ' now=$' + f2(s.price) + ' trueGap=' + pctSign(s.pct) + ' vol=' + fV(s.volume) + ' avgVol=' + fV(s.volAvg), 'data');
     });
 
     // Quality filter with logging
     var qualified=[], rejected=[];
     enriched.forEach(function(s){
+      // Exchange check here — uses reliable exchangeShortName from profile
+      if (s.exchange && !US_EXCHANGES.has(s.exchange.toUpperCase())) {
+        rejected.push(s.symbol + ': Not US exchange (' + s.exchange + ')');
+        return;
+      }
       var check=isQualified(s,minCap);
       if(check.ok) qualified.push(s);
       else{rejected.push(s.symbol+': '+check.reason);}
