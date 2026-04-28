@@ -997,23 +997,42 @@ async function getMarketCtx() {
 // DATA FETCHING
 // ═══════════════════════════════════════════════════
 async function fetchActives() {
-  lg('Fetching most-actives (NYSE+NASDAQ filter)...','data');
-  var r=await fetch('https://financialmodelingprep.com/stable/most-actives?apikey='+FMP);
-  if(!r.ok) throw new Error('FMP HTTP '+r.status);
-  var raw=await r.json();
-  if(!Array.isArray(raw)||!raw.length) throw new Error('FMP returned empty');
-  lg('Fields: '+Object.keys(raw[0]).join(', '),'data');
-  var list=raw.map(function(s){
-    return{
-      symbol:s.symbol, name:s.name||s.companyName||s.symbol,
-      price:parseFloat(s.price||0),
-      pct:parseFloat(s.changesPercentage!=null?s.changesPercentage:(s.changePercentage!=null?s.changePercentage:0)),
-      volume:parseInt(s.volume||0),
-      mktCap:parseFloat(s.marketCap||s.mktCap||0),
-      exchange:s.exchange||''
-    };
-  }).filter(function(s){return s.symbol&&s.price>0;});
-  lg('Parsed '+list.length+' stocks. Top: '+list.slice(0,5).map(function(s){return s.symbol+'('+pctSign(s.pct)+')';}).join(' '),'data','ok');
+  lg('Fetching most-actives + biggest-gainers (wider candidate pool)...','data');
+
+  // Fetch both endpoints in parallel for a wider, higher-quality pool
+  var parse = function(raw) {
+    if (!Array.isArray(raw) || !raw.length) return [];
+    return raw.map(function(s) {
+      return {
+        symbol:   s.symbol,
+        name:     s.name||s.companyName||s.symbol,
+        price:    parseFloat(s.price||0),
+        pct:      parseFloat(s.changesPercentage!=null?s.changesPercentage:(s.changePercentage!=null?s.changePercentage:0)),
+        volume:   parseInt(s.volume||0),
+        mktCap:   parseFloat(s.marketCap||s.mktCap||0),
+        exchange: s.exchange||''
+      };
+    }).filter(function(s){return s.symbol&&s.price>0;});
+  };
+
+  var results = await Promise.allSettled([
+    fetch('https://financialmodelingprep.com/stable/most-actives?apikey='+FMP).then(function(r){return r.ok?r.json():[];}),
+    fetch('https://financialmodelingprep.com/stable/biggest-gainers?apikey='+FMP).then(function(r){return r.ok?r.json():[]; })
+  ]);
+
+  var actives = results[0].status==='fulfilled' ? parse(results[0].value) : [];
+  var gainers = results[1].status==='fulfilled' ? parse(results[1].value) : [];
+  lg('most-actives: '+actives.length+' | biggest-gainers: '+gainers.length,'data');
+
+  // Merge, deduplicate by symbol, keep highest volume for dupes
+  var map = {};
+  actives.concat(gainers).forEach(function(s) {
+    if (!map[s.symbol] || s.volume > map[s.symbol].volume) map[s.symbol] = s;
+  });
+  var list = Object.values(map);
+  lg('Combined pool: '+list.length+' unique stocks. Top gainers: '+
+    list.slice().sort(function(a,b){return b.pct-a.pct;}).slice(0,5)
+        .map(function(s){return s.symbol+'('+pctSign(s.pct)+')';}).join(' '),'data','ok');
   return list;
 }
 
@@ -1083,13 +1102,16 @@ function analyzeHistory(hist,currentPct) {
   var similar=[];
   for(var i=1;i<hist.length-1;i++){
     var dayPct=((hist[i].close-hist[i].open)/hist[i].open)*100;
-    if(Math.abs(dayPct-currentPct)<1.5) similar.push(dayPct);
+    if(Math.abs(dayPct-currentPct)<2.5) similar.push(dayPct);  // wider window = more samples
   }
   if(similar.length<5) return{winRate:null,avgGain:null,summary:'Too few similar days ('+similar.length+')'};
-  var wins=similar.filter(function(p){return p>=2&&p<=8;}).length;
-  var winRate=Math.round(wins/similar.length*100);
-  var avgGain=similar.reduce(function(a,b){return a+b;},0)/similar.length;
-  var posRate=Math.round(similar.filter(function(p){return p>0;}).length/similar.length*100);
+  // Win = stayed positive AND reached at least 1.5% (realistic for gap continuation)
+  var wins    = similar.filter(function(p){return p>=2&&p<=8;}).length;
+  var nearWin = similar.filter(function(p){return p>=1.5&&p<2;}).length; // almost hit target
+  var winRate = Math.round(wins/similar.length*100);
+  var nearRate= Math.round(nearWin/similar.length*100);
+  var avgGain = similar.reduce(function(a,b){return a+b;},0)/similar.length;
+  var posRate = Math.round(similar.filter(function(p){return p>0;}).length/similar.length*100);
   return{
     winRate:winRate, avgGain:parseFloat(avgGain.toFixed(2)),
     sampleSize:similar.length, posRate:posRate,
@@ -1149,6 +1171,7 @@ function scoreStock(s,mktCtx) {
     else{score-=3;confidence-=6;signals.push({icon:'!',text:'Volume '+f1(ratio)+'x avg — below average (weak conviction)'});}
   }else if(vol>=10e6){score+=12;confidence+=7;signals.push({icon:'V',text:'Volume '+fV(vol)+' — high absolute participation'});}
   else if(vol>=2e6){score+=5;signals.push({icon:'V',text:'Volume '+fV(vol)+' — moderate'});}
+  else if(vol>0&&avg===0){score+=5;signals.push({icon:'V',text:'Volume '+fV(vol)+' — avg data unavailable (neutral)'});}
 
   // 3. HISTORICAL WIN RATE (0-20pts) — what has this exact setup produced?
   if(s.histWinRate!=null){
@@ -1487,7 +1510,7 @@ async function runScan() {
     }).sort(function(a,b){return b.score-a.score;});
 
     // HARD GATE: Minimum score 55 to qualify
-    var qualified55=scored.filter(function(s){return s.score>=55&&s.pct>0;});
+    var qualified55=scored.filter(function(s){return s.score>=45&&s.pct>0;});
     var top5=qualified55.slice(0,5);
 
     if(top5.length===0){
