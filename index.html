@@ -1374,7 +1374,7 @@ async function runScan() {
     var mktCtx=await getMarketCtx();
 
     // Market gate
-    if(mktCtx.avg<0&&mktGate==='strict'){
+    if(mktCtx.avg<-0.5&&mktGate==='strict'){  // only block on clearly bearish days
       var gateEl2=document.getElementById('gate-msg');
       if(gateEl2) gateEl2.style.display='block';
       var gSpy=document.getElementById('gate-spy'),gQqq=document.getElementById('gate-qqq');
@@ -1515,19 +1515,22 @@ async function runScan() {
 
     if(top5.length===0){
       // Show why — no stocks met quality threshold
-      lg('No stocks scored 55+. Best score: '+(scored[0]?scored[0].score:0)+'/100','score','warn');
-      lg('Common reasons: market down, volume data missing, low historical win rates','score','warn');
-      // Show top 3 anyway if user in soft/off mode
-      if(mktGate!=='strict'&&scored.length>0){
-        top5=scored.filter(function(s){return s.pct>0;}).slice(0,3);
-        lg('Showing top '+top5.length+' picks despite low scores (market gate='+mktGate+')','score','warn');
+      var bestScore = scored[0] ? scored[0].score : 0;
+      lg('No stocks scored 45+. Best score today: '+bestScore+'/100','score','warn');
+      lg('Reasons: vol data missing (-20pts), low hist win rate (-13pts), market conditions','score','warn');
+      lg('Tip: Set Market Gate to Soft or Off to see picks even on low-score days','score','warn');
+      // ALWAYS show top 3 positive movers so you have something to evaluate
+      var positiveScored = scored.filter(function(s){return s.pct>0;});
+      if(positiveScored.length>0){
+        top5 = positiveScored.slice(0,3);
+        lg('Showing top '+top5.length+' picks (below 45 gate) — use for reference only','score','warn');
       }else{
         var noPickDiv=document.createElement('div');
         noPickDiv.style.cssText='grid-column:1/-1;padding:40px;text-align:center;color:var(--mid)';
         var t1=document.createElement('div');t1.style.cssText='font-family:var(--serif);font-size:20px;margin-bottom:8px;color:var(--pale)';
-        t1.textContent='No High-Quality Setups Today';
+        t1.textContent='No Positive Gap Setups Today';
         var t2=document.createElement('div');t2.style.cssText='font-size:10px;line-height:1.8;max-width:400px;margin:0 auto';
-        t2.textContent='No stocks scored above the 55/100 quality threshold. This happens on low-quality market days, after-hours, or when volume data is unavailable. Try again between 9:35-10:30 AM EST.';
+        t2.textContent='No positive movers found today. Market may be broadly down or it is outside trading hours. Try again between 9:35-10:30 AM EST on a market day.';
         noPickDiv.appendChild(t1);noPickDiv.appendChild(t2);
         var cardsEl=document.getElementById('cards');
         if(cardsEl){cardsEl.innerHTML='';cardsEl.appendChild(noPickDiv);}
@@ -1541,8 +1544,13 @@ async function runScan() {
     }
 
     if(top5.length<5) lg('Only '+top5.length+' picks scored 55+ today','score','warn');
+    // Log ALL scored positive stocks so you can see why each passed/failed gate
+    scored.filter(function(s){return s.pct>0;}).slice(0,10).forEach(function(s,i){
+      var gate=s.score>=45?'PASS':'BELOW-45';
+      lg('#'+(i+1)+' '+s.symbol+' ['+gate+'] score:'+s.score+' gap:+'+f2(s.pct)+'% vol:'+fV(s.volume)+'/avg:'+fV(s.volAvg)+' WR:'+(s.histWinRate!=null?s.histWinRate+'%':'--')+' cap:'+fC(s.mktCap)+' '+s.exchange,'score',s.score>=45?'ok':'warn');
+    });
     top5.forEach(function(s,i){
-      lg('#'+(i+1)+' '+s.symbol+' | Score '+s.score+'/100 | Conf '+s.confidence+'% | +'+f2(s.pct)+'% | WR '+(s.histWinRate!=null?s.histWinRate+'%':'--')+' | '+s.exchange+' | '+s.sector,'score',i===0?'ok':'');
+      lg('PICK #'+(i+1)+' '+s.symbol+' | Score '+s.score+'/100 | Conf '+s.confidence+'% | +'+f2(s.pct)+'% | WR '+(s.histWinRate!=null?s.histWinRate+'%':'--')+' | '+s.exchange+' | '+s.sector,'score',i===0?'ok':'');
     });
 
     setStatus('Fetching live news...',true); setProgress(87);
