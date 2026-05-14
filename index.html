@@ -784,7 +784,9 @@ async function runEODVerification(silent) {
   var today=new Date().toISOString().split('T')[0];
   lg('EOD Verification for '+today+' — fetching actual open/close prices...','db');
   try{
-    var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=eq.'+today+'&select=id,symbol,date,target_min,target_max,price_at_scan,pct_at_scan');
+    // Fetch pending for today AND last 7 days (catches missed verifications)
+    var weekAgo = new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+    var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=gte.'+weekAgo+'&select=id,symbol,date,target_min,target_max,open_price,price_at_scan,pct_at_scan');
     if(!pending||!pending.length){lg('No pending picks for today','db','warn');return;}
     lg('Verifying '+pending.length+' picks using actual market open/close data...','db');
     var hits=0,misses=0,partials=0;
@@ -795,16 +797,19 @@ async function runEODVerification(silent) {
         // q.open  = actual 9:30 AM exchange open price
         // q.price = last traded price (= close price after 4 PM EST)
         // q.previousClose = yesterday's close (for reference)
-        var actualOpen = null, actualClose = null;
+        var actualOpen = null, actualClose = null, actualHigh = null;
         var quoteUrl = 'https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP;
         var qr = await fetch(quoteUrl);
         if (qr.ok) {
           var qd = await qr.json();
           var q  = Array.isArray(qd) ? qd[0] : qd;
           if (q && q.open && q.price) {
-            actualOpen  = parseFloat(q.open);   // real 9:30 AM open
-            actualClose = parseFloat(q.price);  // current/close price
-            lg(pred.symbol + ' quote: open=$' + f2(actualOpen) + ' close=$' + f2(actualClose) + ' prevClose=$' + f2(q.previousClose), 'db');
+            actualOpen  = parseFloat(q.open);                          // real 9:30 AM open
+            actualClose = parseFloat(q.price);                         // last/close price
+            // dayHigh = highest price reached during today's session
+            if (q.dayHigh)  actualHigh = parseFloat(q.dayHigh);
+            else if (q.high) actualHigh = parseFloat(q.high);
+            lg(pred.symbol + ' quote: open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh||actualClose) + ' close=$' + f2(actualClose), 'db');
           }
         }
 
@@ -825,37 +830,54 @@ async function runEODVerification(silent) {
             if (day) {
               actualOpen  = parseFloat(day.open);
               actualClose = parseFloat(day.close);
-              lg(pred.symbol + ': using historical EOD — open=$' + f2(actualOpen) + ' close=$' + f2(actualClose), 'db');
+              actualHigh  = parseFloat(day.high || day.close); // intraday high from historical
+              lg(pred.symbol + ': historical EOD — open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose), 'db');
             }
           }
         }
 
-        if(!actualOpen || !actualClose){
-          lg(pred.symbol+': Could not get open/close data — skipping','db','warn');
+        if (!actualOpen || !actualClose) {
+          lg(pred.symbol + ': Could not get price data — stays pending', 'db', 'warn');
           continue;
         }
 
-        // Step 3: Calculate actual % gain from REAL market open to close
-        var actualPct=((actualClose - actualOpen) / actualOpen) * 100;
+        // INTRADAY HIGH: Did stock reach target at ANY point during the day?
+        // This is the correct professional standard — if it hit the target level
+        // during trading hours it counts as a hit, even if it pulled back by close
+        var actualHigh  = actualHigh || actualClose;  // intraday high (set from quote or hist above)
+        var highPct     = ((actualHigh - actualOpen) / actualOpen) * 100;   // max gain from open
+        var closePct    = ((actualClose - actualOpen) / actualOpen) * 100;  // close gain from open
 
-        // Step 4: Verdict — did stock achieve target range during the day?
+        // Verdict logic — intraday high takes priority
         var verdict;
-        if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
-        else if(actualPct >= pred.target_min * 0.5) verdict='partial'; // got at least halfway there
-        else if(actualPct >= 1.5) verdict='partial'; // meaningful positive move
-        else verdict='miss';
+        if (highPct >= pred.target_min) {
+          // Stock reached or exceeded target at some point during the day
+          verdict = 'hit';
+          lg(pred.symbol + ': HIGH reached target! intraday_high=$' + f2(actualHigh) + ' (+' + f2(highPct) + '%) >= target +' + f2(pred.target_min) + '%', 'db', 'ok');
+        } else if (highPct >= pred.target_min * 0.6) {
+          // Got at least 60% of the way to target
+          verdict = 'partial';
+        } else if (highPct >= 1.5) {
+          // Meaningful positive move but didn't reach target
+          verdict = 'partial';
+        } else {
+          verdict = 'miss';
+        }
 
-        if(verdict==='hit') hits++;
-        else if(verdict==='partial') partials++;
+        if (verdict==='hit') hits++;
+        else if (verdict==='partial') partials++;
         else misses++;
 
-        await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
-          open_price: parseFloat(actualOpen.toFixed(2)),
-          close_price:parseFloat(actualClose.toFixed(2)),
-          actual_pct: parseFloat(actualPct.toFixed(2)),
-          verdict:    verdict
+        await dbQuery('apex_predictions?id=eq.' + pred.id, 'PATCH', {
+          open_price:  parseFloat(actualOpen.toFixed(2)),
+          close_price: parseFloat(actualClose.toFixed(2)),
+          actual_pct:  parseFloat(closePct.toFixed(2)),
+          verdict:     verdict
         });
-        lg(pred.symbol+': actual open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' gain='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol + ': open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose) +
+           ' | highGain=' + pctSign(highPct) + ' closeGain=' + pctSign(closePct) +
+           ' | target=+' + f2(pred.target_min) + '% -> ' + verdict.toUpperCase(),
+           'db', verdict==='hit' ? 'ok' : verdict==='partial' ? 'warn' : 'err');
       }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
       await sleep(200);
     }
@@ -882,30 +904,58 @@ async function reVerifyAll() {
     for (var i=0; i<all.length; i++) {
       var pred = all[i];
       try {
-        var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
-        var r = await fetch(url); if (!r.ok) { skipped++; continue; }
-        var data = await r.json();
-        var hist = data.historical||(Array.isArray(data)?data:[]);
-        var day = hist.find(function(x){return x.date===pred.date;})||hist[0];
-        if (!day) { skipped++; continue; }
-        var actualOpen  = parseFloat(day.open);
-        var actualClose = parseFloat(day.close);
-        var actualPct   = ((actualClose - actualOpen) / actualOpen) * 100;
+        var today2 = new Date().toISOString().split('T')[0];
+        var isToday = pred.date === today2;
+        var actualOpen = null, actualClose = null, actualHigh = null;
+
+        if (isToday) {
+          // Today: use quote endpoint (historical not available yet)
+          var qr2 = await fetch('https://financialmodelingprep.com/stable/quote?symbol='+pred.symbol+'&apikey='+FMP);
+          if (qr2.ok) {
+            var qd2 = await qr2.json();
+            var q2  = Array.isArray(qd2) ? qd2[0] : qd2;
+            if (q2) {
+              actualOpen  = parseFloat(q2.open  || 0);
+              actualClose = parseFloat(q2.price || 0);
+              actualHigh  = parseFloat(q2.dayHigh || q2.high || actualClose);
+            }
+          }
+        } else {
+          // Past dates: use historical EOD (has open, high, close)
+          var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
+          var r = await fetch(url); if (!r.ok) { skipped++; continue; }
+          var data = await r.json();
+          var hist = data.historical||(Array.isArray(data)?data:[]);
+          var day = hist.find(function(x){return x.date===pred.date;})||hist[0];
+          if (day) {
+            actualOpen  = parseFloat(day.open);
+            actualClose = parseFloat(day.close);
+            actualHigh  = parseFloat(day.high || day.close);
+          }
+        }
+
+        if (!actualOpen || !actualClose) { skipped++; continue; }
+
+        // Intraday HIGH verdict — hit if target reached at any point during day
+        actualHigh = actualHigh || actualClose;
+        var highPct  = ((actualHigh - actualOpen) / actualOpen) * 100;
+        var closePct = ((actualClose - actualOpen) / actualOpen) * 100;
         var verdict;
-        if (actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
-        else if (actualPct >= pred.target_min * 0.5) verdict='partial';
-        else if (actualPct >= 1.5) verdict='partial';
-        else verdict='miss';
+        if (highPct >= pred.target_min)          verdict = 'hit';
+        else if (highPct >= pred.target_min*0.6) verdict = 'partial';
+        else if (highPct >= 1.5)                 verdict = 'partial';
+        else                                     verdict = 'miss';
+
         if (verdict==='hit') hits++;
         else if (verdict==='partial') partials++;
         else misses++;
         await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {
           open_price:  parseFloat(actualOpen.toFixed(2)),
           close_price: parseFloat(actualClose.toFixed(2)),
-          actual_pct:  parseFloat(actualPct.toFixed(2)),
+          actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
         });
-        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' -> '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' high=$'+f2(actualHigh)+' close=$'+f2(actualClose)+' highGain='+pctSign(highPct)+' -> '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       } catch(e) { lg('Error '+pred.symbol+': '+e.message, 'db', 'err'); skipped++; }
       await sleep(250);
     }
