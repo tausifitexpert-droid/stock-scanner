@@ -797,68 +797,81 @@ async function runEODVerification(silent) {
         // q.open  = actual 9:30 AM exchange open price
         // q.price = last traded price (= close price after 4 PM EST)
         // q.previousClose = yesterday's close (for reference)
+        // ── STEP 1: Fetch price data — quote first, historical as fallback ──
+        // All vars declared here to avoid scope issues across blocks
         var actualOpen = null, actualClose = null, actualHigh = null;
-        var quoteUrl = 'https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP;
-        var qr = await fetch(quoteUrl);
-        if (qr.ok) {
-          var qd = await qr.json();
-          var q  = Array.isArray(qd) ? qd[0] : qd;
-          if (q && q.open && q.price) {
-            actualOpen  = parseFloat(q.open);                          // real 9:30 AM open
-            actualClose = parseFloat(q.price);                         // last/close price
-            // dayHigh = highest price reached during today's session
-            if (q.dayHigh)  actualHigh = parseFloat(q.dayHigh);
-            else if (q.high) actualHigh = parseFloat(q.high);
-            lg(pred.symbol + ' quote: open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh||actualClose) + ' close=$' + f2(actualClose), 'db');
-          }
-        }
+        var predDate = pred.date;
+        var todayStr = new Date().toISOString().split('T')[0];
 
-        // FALLBACK: if we already have open_price saved from scan time, use it
-        if (!actualOpen && pred.open_price) {
+        // PRIMARY: stable/quote works same day, returns open/price/dayHigh
+        try {
+          var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP);
+          if (qr.ok) {
+            var qdata = await qr.json();
+            var q0    = Array.isArray(qdata) ? qdata[0] : qdata;
+            if (q0 && q0.symbol) {
+              // Use open if > 0, otherwise skip (pre-market q.open can be 0)
+              var qOpen  = parseFloat(q0.open  || 0);
+              var qPrice = parseFloat(q0.price || 0);
+              var qHigh  = parseFloat(q0.dayHigh || q0.high || qPrice);
+              if (qOpen > 0 && qPrice > 0) {
+                actualOpen  = qOpen;
+                actualClose = qPrice;
+                actualHigh  = qHigh > qOpen ? qHigh : qPrice;
+                lg(pred.symbol + ' [quote] open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose), 'db');
+              }
+            }
+          }
+        } catch(qErr) { lg(pred.symbol + ' quote error: ' + qErr.message, 'db', 'warn'); }
+
+        // FALLBACK 1: saved open_price from scan time (if quote open was 0)
+        if (!actualOpen && pred.open_price && parseFloat(pred.open_price) > 0) {
           actualOpen = parseFloat(pred.open_price);
           lg(pred.symbol + ': using saved open_price=$' + f2(actualOpen), 'db', 'warn');
         }
 
-        // FALLBACK 2: historical EOD (available next morning for past dates)
+        // FALLBACK 2: historical EOD — use pred.date not today (works for past dates)
         if (!actualOpen || !actualClose) {
-          var histUrl = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=' + pred.symbol + '&from=' + today + '&to=' + today + '&apikey=' + FMP;
-          var hr = await fetch(histUrl);
-          if (hr.ok) {
-            var hd = await hr.json();
-            var hist = hd.historical || (Array.isArray(hd) ? hd : []);
-            var day  = hist.find(function(x) { return x.date === today; }) || hist[0];
-            if (day) {
-              actualOpen  = parseFloat(day.open);
-              actualClose = parseFloat(day.close);
-              actualHigh  = parseFloat(day.high || day.close); // intraday high from historical
-              lg(pred.symbol + ': historical EOD — open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose), 'db');
+          try {
+            var histUrl = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=' + pred.symbol + '&from=' + predDate + '&to=' + predDate + '&apikey=' + FMP;
+            var hr = await fetch(histUrl);
+            if (hr.ok) {
+              var hdata = await hr.json();
+              var harr  = hdata.historical || (Array.isArray(hdata) ? hdata : []);
+              var hday  = harr.find(function(x) { return x.date === predDate; }) || harr[0];
+              if (hday && parseFloat(hday.open) > 0) {
+                actualOpen  = parseFloat(hday.open);
+                actualClose = parseFloat(hday.close);
+                actualHigh  = parseFloat(hday.high  || hday.close);
+                lg(pred.symbol + ' [historical] open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose), 'db');
+              }
             }
-          }
+          } catch(hErr) { lg(pred.symbol + ' hist error: ' + hErr.message, 'db', 'warn'); }
         }
 
+        // If still no data, leave pending and move on
         if (!actualOpen || !actualClose) {
-          lg(pred.symbol + ': Could not get price data — stays pending', 'db', 'warn');
+          lg(pred.symbol + ': no price data available yet — stays pending', 'db', 'warn');
           continue;
         }
 
-        // INTRADAY HIGH: Did stock reach target at ANY point during the day?
-        // This is the correct professional standard — if it hit the target level
-        // during trading hours it counts as a hit, even if it pulled back by close
-        var actualHigh  = actualHigh || actualClose;  // intraday high (set from quote or hist above)
-        var highPct     = ((actualHigh - actualOpen) / actualOpen) * 100;   // max gain from open
-        var closePct    = ((actualClose - actualOpen) / actualOpen) * 100;  // close gain from open
+        // Ensure high is never less than open or close
+        actualHigh = Math.max(actualHigh || 0, actualOpen, actualClose);
 
-        // Verdict logic — intraday high takes priority
+        // ── STEP 2: Calculate gains ──
+        var highPct  = ((actualHigh  - actualOpen) / actualOpen) * 100;
+        var closePct = ((actualClose - actualOpen) / actualOpen) * 100;
+
+        // ── STEP 3: Verdict — intraday HIGH determines hit ──
+        // If stock reached target at ANY point during the day = HIT
+        // Even if it pulled back by close
         var verdict;
         if (highPct >= pred.target_min) {
-          // Stock reached or exceeded target at some point during the day
           verdict = 'hit';
-          lg(pred.symbol + ': HIGH reached target! intraday_high=$' + f2(actualHigh) + ' (+' + f2(highPct) + '%) >= target +' + f2(pred.target_min) + '%', 'db', 'ok');
+          lg(pred.symbol + ': TARGET HIT — high=$' + f2(actualHigh) + ' (+' + f2(highPct) + '%) >= target +' + f2(pred.target_min) + '%', 'db', 'ok');
         } else if (highPct >= pred.target_min * 0.6) {
-          // Got at least 60% of the way to target
           verdict = 'partial';
         } else if (highPct >= 1.5) {
-          // Meaningful positive move but didn't reach target
           verdict = 'partial';
         } else {
           verdict = 'miss';
@@ -874,10 +887,7 @@ async function runEODVerification(silent) {
           actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
         });
-        lg(pred.symbol + ': open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose) +
-           ' | highGain=' + pctSign(highPct) + ' closeGain=' + pctSign(closePct) +
-           ' | target=+' + f2(pred.target_min) + '% -> ' + verdict.toUpperCase(),
-           'db', verdict==='hit' ? 'ok' : verdict==='partial' ? 'warn' : 'err');
+        lg(pred.symbol + ' ' + predDate + ': open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose) + ' | highGain=' + pctSign(highPct) + ' closeGain=' + pctSign(closePct) + ' | target=+' + f2(pred.target_min) + '% -> ' + verdict.toUpperCase(), 'db', verdict==='hit' ? 'ok' : verdict==='partial' ? 'warn' : 'err');
       }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
       await sleep(200);
     }
@@ -908,37 +918,40 @@ async function reVerifyAll() {
         var isToday = pred.date === today2;
         var actualOpen = null, actualClose = null, actualHigh = null;
 
-        if (isToday) {
-          // Today: use quote endpoint (historical not available yet)
-          var qr2 = await fetch('https://financialmodelingprep.com/stable/quote?symbol='+pred.symbol+'&apikey='+FMP);
-          if (qr2.ok) {
-            var qd2 = await qr2.json();
-            var q2  = Array.isArray(qd2) ? qd2[0] : qd2;
-            if (q2) {
-              actualOpen  = parseFloat(q2.open  || 0);
-              actualClose = parseFloat(q2.price || 0);
-              actualHigh  = parseFloat(q2.dayHigh || q2.high || actualClose);
+        // Try quote first (works today and recent days)
+        try {
+          var qrv = await fetch('https://financialmodelingprep.com/stable/quote?symbol='+pred.symbol+'&apikey='+FMP);
+          if (qrv.ok) {
+            var qdv = await qrv.json();
+            var qv  = Array.isArray(qdv) ? qdv[0] : qdv;
+            if (qv && parseFloat(qv.open||0) > 0 && parseFloat(qv.price||0) > 0) {
+              actualOpen  = parseFloat(qv.open);
+              actualClose = parseFloat(qv.price);
+              actualHigh  = parseFloat(qv.dayHigh || qv.high || qv.price);
             }
           }
-        } else {
-          // Past dates: use historical EOD (has open, high, close)
-          var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
-          var r = await fetch(url); if (!r.ok) { skipped++; continue; }
-          var data = await r.json();
-          var hist = data.historical||(Array.isArray(data)?data:[]);
-          var day = hist.find(function(x){return x.date===pred.date;})||hist[0];
-          if (day) {
-            actualOpen  = parseFloat(day.open);
-            actualClose = parseFloat(day.close);
-            actualHigh  = parseFloat(day.high || day.close);
-          }
+        } catch(e2) {}
+
+        // Historical EOD for past dates or if quote gave no open
+        if (!actualOpen || !actualClose) {
+          try {
+            var ur2  = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
+            var rv2  = await fetch(ur2); if (!rv2.ok) { skipped++; continue; }
+            var dv2  = await rv2.json();
+            var hv2  = dv2.historical||(Array.isArray(dv2)?dv2:[]);
+            var dv   = hv2.find(function(x){return x.date===pred.date;})||hv2[0];
+            if (dv && parseFloat(dv.open||0) > 0) {
+              actualOpen  = parseFloat(dv.open);
+              actualClose = parseFloat(dv.close);
+              actualHigh  = parseFloat(dv.high || dv.close);
+            }
+          } catch(e3) { skipped++; continue; }
         }
 
         if (!actualOpen || !actualClose) { skipped++; continue; }
 
-        // Intraday HIGH verdict — hit if target reached at any point during day
-        actualHigh = actualHigh || actualClose;
-        var highPct  = ((actualHigh - actualOpen) / actualOpen) * 100;
+        actualHigh = Math.max(actualHigh || 0, actualOpen, actualClose);
+        var highPct  = ((actualHigh  - actualOpen) / actualOpen) * 100;
         var closePct = ((actualClose - actualOpen) / actualOpen) * 100;
         var verdict;
         if (highPct >= pred.target_min)          verdict = 'hit';
@@ -955,7 +968,7 @@ async function reVerifyAll() {
           actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
         });
-        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' high=$'+f2(actualHigh)+' close=$'+f2(actualClose)+' highGain='+pctSign(highPct)+' -> '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' high=$'+f2(actualHigh)+' close=$'+f2(actualClose)+' | highGain='+pctSign(highPct)+' -> '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       } catch(e) { lg('Error '+pred.symbol+': '+e.message, 'db', 'err'); skipped++; }
       await sleep(250);
     }
