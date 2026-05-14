@@ -680,12 +680,24 @@ function switchTab(tab) {
 // ═══════════════════════════════════════════════════
 async function dbQuery(path,method,body) {
   method=method||'GET';
-  var headers={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
-  if(method==='POST'||method==='PATCH') headers['Prefer']='return=representation';
+  var headers={
+    'apikey':SB_KEY,
+    'Authorization':'Bearer '+SB_KEY,
+    'Content-Type':'application/json'
+  };
+  // Supabase: PATCH needs Prefer=return=minimal to avoid 406
+  // POST needs return=representation to get back the inserted row
+  if(method==='POST') headers['Prefer']='return=representation';
+  if(method==='PATCH') headers['Prefer']='return=minimal';
   var opts={method:method,headers:headers};
   if(body) opts.body=JSON.stringify(body);
   var r=await fetch(SB_URL+'/rest/v1/'+path,opts);
-  if(!r.ok){var txt=await r.text();throw new Error('DB '+r.status+': '+txt.slice(0,120));}
+  if(!r.ok){
+    var txt=await r.text();
+    var errMsg='DB '+r.status+' ('+method+' '+path.slice(0,40)+'): '+txt.slice(0,200);
+    throw new Error(errMsg);
+  }
+  // PATCH with return=minimal returns 204 No Content — that is success
   return r.status===204?null:r.json();
 }
 
@@ -881,14 +893,17 @@ async function runEODVerification(silent) {
         else if (verdict==='partial') partials++;
         else misses++;
 
-        await dbQuery('apex_predictions?id=eq.' + pred.id, 'PATCH', {
+        var patchBody = {
           open_price:  parseFloat(actualOpen.toFixed(2)),
           close_price: parseFloat(actualClose.toFixed(2)),
           actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
-        });
+        };
+        lg(pred.symbol + ' PATCHING id=' + pred.id + ' verdict=' + verdict + ' open=' + patchBody.open_price + ' close=' + patchBody.close_price, 'db');
+        await dbQuery('apex_predictions?id=eq.' + pred.id, 'PATCH', patchBody);
+        lg(pred.symbol + ' PATCH SUCCESS', 'db', 'ok');
         lg(pred.symbol + ' ' + predDate + ': open=$' + f2(actualOpen) + ' high=$' + f2(actualHigh) + ' close=$' + f2(actualClose) + ' | highGain=' + pctSign(highPct) + ' closeGain=' + pctSign(closePct) + ' | target=+' + f2(pred.target_min) + '% -> ' + verdict.toUpperCase(), 'db', verdict==='hit' ? 'ok' : verdict==='partial' ? 'warn' : 'err');
-      }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
+      }catch(e){lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); console.error('APEX EOD error',pred.symbol, e);}
       await sleep(200);
     }
     lg('EOD Results: '+hits+' hits, '+partials+' partial, '+misses+' misses / '+pending.length+' total','db','ok');
@@ -1014,7 +1029,7 @@ async function runVerification() {
           verdict:verdict
         });
         lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
-      }catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');}
+      }catch(e){lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); console.error('APEX EOD error',pred.symbol, e);}
       await sleep(150);
     }
     await loadHistory();
