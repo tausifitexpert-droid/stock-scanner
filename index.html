@@ -534,7 +534,8 @@ var mktStatus = {
 };
 
 async function checkMarketStatus() {
-  var today = new Date().toISOString().split('T')[0];
+    var estTmp=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  var today=estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
   try {
     // 1. Exchange market hours — returns isMarketOpen + holiday flag
     var r1 = await fetch('https://financialmodelingprep.com/stable/exchange-market-hours?exchange=NASDAQ&apikey=' + FMP);
@@ -617,7 +618,7 @@ function checkAutoEOD() {
   var est     = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
   var wd      = est.getDay();
   var hm      = est.getHours() * 60 + est.getMinutes();
-  var dateStr = est.toISOString().split('T')[0];
+  var dateStr = est.getFullYear()+'-'+String(est.getMonth()+1).padStart(2,'0')+'-'+String(est.getDate()).padStart(2,'0');
 
   if (wd === 0 || wd === 6) return;           // skip weekends
   if (hm < 961 || hm > 1005) return;          // 4:01 PM - 4:45 PM only
@@ -661,7 +662,7 @@ function checkAutoScan() {
   var est    = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
   var wd     = est.getDay();
   var hm     = est.getHours() * 60 + est.getMinutes();
-  var dateStr = est.toISOString().split('T')[0];
+  var dateStr = est.getFullYear()+'-'+String(est.getMonth()+1).padStart(2,'0')+'-'+String(est.getDate()).padStart(2,'0');
 
   // Only weekdays
   if (wd === 0 || wd === 6) return;
@@ -861,11 +862,14 @@ async function runEODVerification(silent) {
   }
   if (!silent && btn) { btn.textContent = 'Verifying...'; btn.disabled = true; }
   if (!silent) lg('Manual EOD verification triggered', 'db');
-  var today=new Date().toISOString().split('T')[0];
+  // Use EST date for today — UTC can be next day after 8PM EST
+  var estNow2  = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  var today    = estNow2.getFullYear()+'-'+String(estNow2.getMonth()+1).padStart(2,'0')+'-'+String(estNow2.getDate()).padStart(2,'0');
   lg('EOD Verification for '+today+' — fetching actual open/close prices...','db');
   try{
     // Fetch pending for today AND last 7 days (catches missed verifications)
-    var weekAgo = new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+    var estWk   = new Date(new Date(Date.now()-7*24*60*60*1000).toLocaleString('en-US',{timeZone:'America/New_York'}));
+  var weekAgo = estWk.getFullYear()+'-'+String(estWk.getMonth()+1).padStart(2,'0')+'-'+String(estWk.getDate()).padStart(2,'0');
     var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=gte.'+weekAgo+'&select=id,symbol,date,target_min,target_max,open_price,price_at_scan,pct_at_scan');
     if(!pending||!pending.length){lg('No pending picks for today','db','warn');return;}
     lg('Verifying '+pending.length+' picks using actual market open/close data...','db');
@@ -924,7 +928,12 @@ async function runEODVerification(silent) {
 // ── SHARED: Get OHLC data for any symbol on any date ──────────
 // Tries multiple endpoints in order, returns {open, high, close} or null
 async function getOHLC(symbol, dateStr) {
-  var todayStr = new Date().toISOString().split('T')[0];
+  // Use EST date (not UTC) — after 8PM EST, UTC is already tomorrow
+  var estNow   = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  var estY     = estNow.getFullYear();
+  var estM     = String(estNow.getMonth()+1).padStart(2,'0');
+  var estD     = String(estNow.getDate()).padStart(2,'0');
+  var todayStr = estY + '-' + estM + '-' + estD;
   var isToday  = dateStr === todayStr;
 
   // For TODAY only: use stable/quote (gives live open/high/price)
@@ -1005,7 +1014,8 @@ async function reVerifyAll() {
     for (var i=0; i<all.length; i++) {
       var pred = all[i];
       try {
-        var today2 = new Date().toISOString().split('T')[0];
+        var estNow3 = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+    var today2  = estNow3.getFullYear()+'-'+String(estNow3.getMonth()+1).padStart(2,'0')+'-'+String(estNow3.getDate()).padStart(2,'0');
         var isToday = pred.date === today2;
         var actualOpen = null, actualClose = null, actualHigh = null;
 
@@ -1045,7 +1055,8 @@ async function reVerifyAll() {
 
 // Past pending verification
 async function runVerification() {
-  var today=new Date().toISOString().split('T')[0];
+    var estTmp=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  var today=estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
   lg('Verifying past pending predictions...','db');
   try{
     var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=lt.'+today+'&select=id,symbol,date,target_min,target_max');
@@ -1212,7 +1223,8 @@ async function fetchQuotes(symbols) {
 
 async function fetchHistorical(symbol) {
   try{
-    var to=new Date().toISOString().split('T')[0];
+    var estHst=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    var to=estHst.getFullYear()+'-'+String(estHst.getMonth()+1).padStart(2,'0')+'-'+String(estHst.getDate()).padStart(2,'0');
     var from=new Date(Date.now()-5*365*24*60*60*1000).toISOString().split('T')[0];
     var r=await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+symbol+'&from='+from+'&to='+to+'&apikey='+FMP);
     if(!r.ok) return null;
@@ -1470,28 +1482,52 @@ async function runScan() {
   lg('APEX v3 Scan · '+new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' EST');
 
   // HOLIDAY / WEEKEND GATE — block scan on non-trading days
-  if (mktStatus.checked) {
-    var est2 = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
-    var wd2  = est2.getDay();
-    if (wd2 === 0 || wd2 === 6) {
-      showError('Market is closed — today is a weekend. Scans only work Monday-Friday during market hours.');
-      setStatus('Weekend — market closed', false);
-      if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
-      return;
-    }
-    if (mktStatus.isHoliday) {
-      showError('Market closed today: ' + mktStatus.holidayName + '. No trading data available — scan skipped to avoid corrupt results.');
-      setStatus('Market holiday: ' + mktStatus.holidayName, false);
-      lg('SCAN BLOCKED: Market holiday — ' + mktStatus.holidayName, 'mkt', 'warn');
-      if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
-      return;
-    }
+  // ── MARKET HOURS GATE ──────────────────────────────────────
+  // Block scan outside trading hours — no live data = corrupt results
+  var gateEst = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var gateWd  = gateEst.getDay();
+  var gateHm  = gateEst.getHours() * 60 + gateEst.getMinutes();
+  var mktGateSetting = (document.getElementById('mktGate') || {value:'strict'}).value;
+
+  // Weekend block (always)
+  if (gateWd === 0 || gateWd === 6) {
+    showError('Market is closed — today is a weekend. Come back Monday morning.');
+    setStatus('Weekend — market closed', false);
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+    return;
+  }
+
+  // Holiday block (always)
+  if (mktStatus.checked && mktStatus.isHoliday) {
+    showError('Market holiday: ' + mktStatus.holidayName + '. No trading today — scan blocked.');
+    setStatus('Market holiday — no scan', false);
+    lg('SCAN BLOCKED: Market holiday — ' + mktStatus.holidayName, 'mkt', 'warn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+    return;
+  }
+
+  // Pre-market block: before 9:30 AM EST (570 min)
+  if (gateHm < 570) {
+    showError('Market not open yet — pre-market hours. Scan from 9:30 AM EST when live prices are available.');
+    setStatus('Pre-market — opens at 9:30 AM EST', false);
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+    return;
+  }
+
+  // After-hours block: after 4:00 PM EST (960 min) — strict and soft mode
+  if (gateHm >= 960 && mktGateSetting !== 'off') {
+    showError('Market closed at 4:00 PM EST. Today\'s scan data is no longer live. Check the History tab for today\'s results, or run \'Verify Today\'s Results\' to close out picks.');
+    setStatus('After-hours — market closed', false);
+    lg('SCAN BLOCKED: After-hours (' + gateEst.getHours() + ':' + String(gateEst.getMinutes()).padStart(2,'0') + ' EST)', 'mkt', 'warn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Morning Scan'; }
+    return;
   }
   var minPct=parseFloat((document.getElementById('minPct')||{value:'1'}).value)||0;
   var minPrice=parseFloat((document.getElementById('minPrice')||{value:'5'}).value)||5;
   var minCap=parseFloat((document.getElementById('minCap')||{value:'500000000'}).value)||0;
   var mktGate=(document.getElementById('mktGate')||{value:'strict'}).value;
-  var today=new Date().toISOString().split('T')[0];
+    var estTmp=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  var today=estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
 
   try{
     // STEP 1: Market breadth
