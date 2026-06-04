@@ -365,7 +365,8 @@ td.up{color:var(--green);font-weight:600;}td.dn{color:var(--red);font-weight:600
           </select>
         </div>
         <button class="scan-btn" id="scan-btn" onclick="runScan()">Run Morning Scan</button>
-        <div class="s-status" id="status-text">Ready · Best used 9:35-9:45 AM EST</div>
+        <div class="s-status" id="status-text">Ready · Auto-runs at 9:35 AM EST</div>
+        <div style="font-size:8px;color:var(--dim);text-align:center;margin-top:3px;" id="auto-scan-status">Auto-scan: enabled</div>
         <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
         <div class="steps">
           <div class="step" id="s1"><div class="step-dot"></div><div class="step-pulse"></div>Market breadth check</div>
@@ -378,6 +379,9 @@ td.up{color:var(--green);font-weight:600;}td.dn{color:var(--red);font-weight:600
     </div>
 
     <div class="err" id="err-panel"><div class="err-lbl">Error</div><div class="err-msg" id="err-msg"></div></div>
+    <!-- Auto-scan notification banner -->
+    <div id="auto-scan-banner" style="display:none;background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.3);padding:10px 18px;margin-bottom:16px;font-size:10px;color:var(--amber2);letter-spacing:.08em;text-align:center;"></div>
+
     <div class="gate-msg" id="gate-msg">
       <div class="gate-title">Market Conditions Not Favorable</div>
       <div class="gate-desc" id="gate-desc">The broad market is down today. Gap plays have significantly lower success rates in bearish conditions. Consider waiting for a bullish day.</div>
@@ -644,6 +648,70 @@ function checkAutoEOD() {
 setInterval(checkAutoEOD, 60000);
 setTimeout(checkAutoEOD, 3000);
 
+// ═══════════════════════════════════════════════════════
+// AUTO MORNING SCAN SCHEDULER
+// Automatically runs the scan at 9:35 AM EST every weekday
+// Page must be open — checks every 60 seconds
+// Skips weekends and market holidays automatically
+// Results are saved to DB so you always have a record
+// ═══════════════════════════════════════════════════════
+var autoScanRan = localStorage.getItem('autoScanRan') || '';
+
+function checkAutoScan() {
+  var est    = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/New_York'}));
+  var wd     = est.getDay();
+  var hm     = est.getHours() * 60 + est.getMinutes();
+  var dateStr = est.toISOString().split('T')[0];
+
+  // Only weekdays
+  if (wd === 0 || wd === 6) return;
+  // Only between 9:35 AM (575 min) and 9:55 AM (595 min)
+  // Narrow window — we want fresh open data, not stale mid-morning
+  if (hm < 575 || hm > 595) return;
+  // Only once per day
+  if (autoScanRan === dateStr) return;
+  // Skip if market is a holiday
+  if (mktStatus.checked && mktStatus.isHoliday) {
+    lg('AUTO SCAN: Skipping — market holiday (' + mktStatus.holidayName + ')', 'mkt', 'warn');
+    autoScanRan = dateStr;
+    localStorage.setItem('autoScanRan', dateStr);
+    return;
+  }
+  // Skip if scan already ran manually today (don't duplicate)
+  var scanBtn = document.getElementById('scan-btn');
+  if (scanBtn && scanBtn.disabled) return;
+
+  // Mark ran BEFORE starting to prevent double-trigger
+  autoScanRan = dateStr;
+  localStorage.setItem('autoScanRan', dateStr);
+
+  var h = est.getHours(), m = String(est.getMinutes()).padStart(2,'0');
+  lg('AUTO SCAN: Triggering morning scan at ' + h + ':' + m + ' EST — ' + dateStr, 'mkt', 'ok');
+
+  // Show a visible notification banner
+  var banner = document.getElementById('auto-scan-banner');
+  if (banner) {
+    banner.textContent = 'Auto-scanning at ' + h + ':' + m + ' EST...';
+    banner.style.display = 'block';
+    setTimeout(function() { banner.style.display = 'none'; }, 8000);
+  }
+
+  // Switch to scan tab if on history tab
+  var scanPanel = document.getElementById('tab-scan');
+  if (scanPanel && !scanPanel.classList.contains('active')) {
+    switchTab('scan');
+  }
+
+  // Run the scan
+  runScan().catch(function(e) {
+    lg('AUTO SCAN error: ' + e.message, 'err', 'err');
+    // Reset so it can retry in next window tomorrow
+  });
+}
+
+setInterval(checkAutoScan, 60000);
+setTimeout(checkAutoScan, 5000); // also check shortly after page load
+
 function lg(msg,phase,type) {
   var wrap=document.getElementById('log-wrap');
   if(wrap) wrap.style.display='block';
@@ -859,30 +927,32 @@ async function getOHLC(symbol, dateStr) {
   var todayStr = new Date().toISOString().split('T')[0];
   var isToday  = dateStr === todayStr;
 
-  // 1. stable/quote — works for today AND recent sessions
-  try {
-    var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + symbol + '&apikey=' + FMP);
-    if (qr.ok) {
-      var qd = await qr.json();
-      var q  = Array.isArray(qd) ? qd[0] : qd;
-      if (q && q.symbol) {
-        var qOpen  = parseFloat(q.open  || 0);
-        var qPrice = parseFloat(q.price || 0);
-        var qHigh  = parseFloat(q.dayHigh || q.high || qPrice);
-        var qPrev  = parseFloat(q.previousClose || 0);
-        // If open is 0 (sometimes happens after hours), use previousClose
-        if (qOpen <= 0 && qPrev > 0) qOpen = qPrev;
-        if (qOpen > 0 && qPrice > 0) {
-          return {
-            open:  qOpen,
-            high:  Math.max(qHigh, qOpen, qPrice),
-            close: qPrice,
-            src:   'quote'
-          };
+  // For TODAY only: use stable/quote (gives live open/high/price)
+  // For PAST dates: skip quote (it returns today's data, not the requested date)
+  if (isToday) {
+    try {
+      var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + symbol + '&apikey=' + FMP);
+      if (qr.ok) {
+        var qd = await qr.json();
+        var q  = Array.isArray(qd) ? qd[0] : qd;
+        if (q && q.symbol) {
+          var qOpen  = parseFloat(q.open  || 0);
+          var qPrice = parseFloat(q.price || 0);
+          var qHigh  = parseFloat(q.dayHigh || q.high || qPrice);
+          var qPrev  = parseFloat(q.previousClose || 0);
+          if (qOpen <= 0 && qPrev > 0) qOpen = qPrev;
+          if (qOpen > 0 && qPrice > 0) {
+            return {
+              open:  qOpen,
+              high:  Math.max(qHigh, qOpen, qPrice),
+              close: qPrice,
+              src:   'quote'
+            };
+          }
         }
       }
-    }
-  } catch(e) {}
+    } catch(e) {}
+  }
 
   // 2. stable/historical-price-eod — fetch ±5 day window, match nearest date
   try {
@@ -894,24 +964,27 @@ async function getOHLC(symbol, dateStr) {
       var hd   = await hr.json();
       var harr = hd.historical || (Array.isArray(hd) ? hd : []);
       if (harr.length > 0) {
-        // Find exact date match first, then nearest trading day
-        var day = harr.find(function(x) { return x.date === dateStr; });
-        if (!day) {
-          // Sort by proximity to target date
-          harr.sort(function(a,b) {
-            return Math.abs(new Date(a.date) - d) - Math.abs(new Date(b.date) - d);
-          });
-          day = harr[0];
+          // Find exact date match first
+          var day = harr.find(function(x) { return x.date === dateStr; });
+          if (!day) {
+            // Find nearest past trading day (stocks only trade on weekdays)
+            var pastDays = harr.filter(function(x) { return x.date <= dateStr; });
+            if (pastDays.length > 0) {
+              pastDays.sort(function(a,b) { return b.date.localeCompare(a.date); });
+              day = pastDays[0];
+            } else {
+              day = harr[0];
+            }
+          }
+          if (day && parseFloat(day.open||0) > 0) {
+            return {
+              open:  parseFloat(day.open),
+              high:  parseFloat(day.high  || day.close),
+              close: parseFloat(day.close),
+              src:   'historical:' + day.date
+            };
+          }
         }
-        if (day && parseFloat(day.open||0) > 0) {
-          return {
-            open:  parseFloat(day.open),
-            high:  parseFloat(day.high  || day.close),
-            close: parseFloat(day.close),
-            src:   'historical:' + day.date
-          };
-        }
-      }
     }
   } catch(e) {}
 
