@@ -855,120 +855,92 @@ function renderHistory(rows) {
 async function runEODVerification(silent) {
   var btn = document.getElementById('eod-btn');
   if (mktStatus.checked && mktStatus.isHoliday) {
-    var msg = 'Market was closed today (' + mktStatus.holidayName + ') — no trades to verify.';
-    if (!silent) { showError(msg); lg(msg, 'db', 'warn'); }
-    else lg('EOD skipped: holiday — ' + mktStatus.holidayName, 'db', 'warn');
+    var msg = 'Market closed today (' + mktStatus.holidayName + ') — nothing to verify.';
+    if (!silent) { showError(msg); lg(msg, 'db', 'warn'); } else lg(msg, 'db', 'warn');
     return;
   }
   if (!silent && btn) { btn.textContent = 'Verifying...'; btn.disabled = true; }
-  if (!silent) lg('Manual EOD verification triggered', 'db');
 
-  // Get EST today
   var estNow2  = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
   var today    = estNow2.getFullYear()+'-'+String(estNow2.getMonth()+1).padStart(2,'0')+'-'+String(estNow2.getDate()).padStart(2,'0');
   var estWk    = new Date(new Date(Date.now()-7*24*60*60*1000).toLocaleString('en-US',{timeZone:'America/New_York'}));
   var weekAgo  = estWk.getFullYear()+'-'+String(estWk.getMonth()+1).padStart(2,'0')+'-'+String(estWk.getDate()).padStart(2,'0');
+  lg('EOD Verification: pending picks from ' + weekAgo + ' to ' + today, 'db');
 
-  lg('EOD Verification for week ' + weekAgo + ' to ' + today, 'db');
   try {
-    var pending = await dbQuery('apex_predictions?verdict=eq.pending&date=gte.'+weekAgo+'&select=id,symbol,date,target_min,target_max,open_price');
+    var pending = await dbQuery('apex_predictions?verdict=eq.pending&date=gte.'+weekAgo+'&select=id,symbol,date,target_min,target_max');
     if (!pending || !pending.length) { lg('No pending picks this week', 'db', 'warn'); return; }
-    lg('Verifying ' + pending.length + ' pending picks...', 'db');
+    lg('Found ' + pending.length + ' pending picks', 'db');
 
-    // Batch quote call for today's symbols (single API call)
-    var todayPicks = pending.filter(function(p){ return p.date === today; });
-    var quoteMap   = {};
-    if (todayPicks.length > 0) {
-      var syms = todayPicks.map(function(p){ return p.symbol; }).join(',');
+    var estNow3 = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+    var todayStr= estNow3.getFullYear()+'-'+String(estNow3.getMonth()+1).padStart(2,'0')+'-'+String(estNow3.getDate()).padStart(2,'0');
+
+    // Get unique symbols across all pending picks
+    var syms = [];
+    pending.forEach(function(p){ if(syms.indexOf(p.symbol)===-1) syms.push(p.symbol); });
+
+    // Fetch historical for past-date symbols (one call per unique symbol)
+    var fromDate = new Date(Date.now() - 14*24*60*60*1000);
+    var fromStr  = fromDate.getFullYear()+'-'+String(fromDate.getMonth()+1).padStart(2,'0')+'-'+String(fromDate.getDate()).padStart(2,'0');
+    var histCache = {};
+    var pastSyms  = syms.filter(function(s){ return pending.some(function(p){ return p.symbol===s && p.date!==todayStr; }); });
+
+    for (var si=0; si<pastSyms.length; si++) {
+      var sym = pastSyms[si];
       try {
-        var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol='+syms+'&apikey='+FMP);
-        if (qr.ok) {
-          var qd   = await qr.json();
-          var qarr = Array.isArray(qd) ? qd : [qd];
-          qarr.forEach(function(q){ if(q && q.symbol) quoteMap[q.symbol] = q; });
-          lg('Batch quote: ' + Object.keys(quoteMap).length + ' symbols loaded in 1 call', 'db', 'ok');
+        var hr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
+        if (hr.ok) {
+          var hd = await hr.json();
+          var hist = hd.historical||(Array.isArray(hd)?hd:[]);
+          if (!hist.length) { var ks=Object.keys(hd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(hd[ks[ki]])){hist=hd[ks[ki]];break;}} }
+          var byDate = {};
+          hist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open),high:parseFloat(row.high||row.close),close:parseFloat(row.close)}; });
+          histCache[sym] = byDate;
+          lg(sym + ': ' + hist.length + ' days', 'db', hist.length>0?'ok':'warn');
         }
-      } catch(qe) { lg('Batch quote error: ' + qe.message, 'db', 'warn'); }
+      } catch(e) { lg(sym + ' hist error: '+e.message, 'db', 'err'); histCache[sym]={}; }
+      await sleep(1200);
     }
 
-    // Bulk EOD for past dates
-    var pastDates = [...new Set(pending.filter(function(p){return p.date!==today;}).map(function(p){return p.date;}))];
-    var bulkMap   = {}; // date -> {symbol -> row}
-    for (var di = 0; di < pastDates.length; di++) {
-      var dt = pastDates[di];
+    // Batch quote for today's pending symbols
+    var quoteMap = {};
+    var todaySyms = pending.filter(function(p){ return p.date===todayStr; }).map(function(p){ return p.symbol; });
+    if (todaySyms.length > 0) {
       try {
-        var br = await fetch('https://financialmodelingprep.com/stable/eod-bulk?date='+dt+'&apikey='+FMP);
-        if (br.ok) {
-          var bd   = await br.json();
-          var barr = Array.isArray(bd) ? bd : (bd.data || []);
-          if (!barr.length) { var ks=Object.keys(bd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(bd[ks[ki]])){barr=bd[ks[ki]];break;}} }
-          var sm = {};
-          barr.forEach(function(row){ var s=row.symbol||row.ticker; if(s) sm[s]=row; });
-          bulkMap[dt] = sm;
-          lg('Bulk EOD ' + dt + ': ' + barr.length + ' stocks', 'db', 'ok');
-        }
-      } catch(be) { lg('Bulk error ' + dt + ': ' + be.message, 'db', 'warn'); }
-      await sleep(300);
+        var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol='+todaySyms.join(',')+'&apikey='+FMP);
+        if (qr.ok) { var qd=await qr.json(); (Array.isArray(qd)?qd:[qd]).forEach(function(q){if(q&&q.symbol)quoteMap[q.symbol]=q;}); }
+        lg('Today quotes: ' + Object.keys(quoteMap).length + ' loaded', 'db', 'ok');
+      } catch(qe) {}
     }
 
-    var hits=0, partials=0, misses=0, skipped=0;
-    for (var i = 0; i < pending.length; i++) {
+    var hits=0,partials=0,misses=0,skipped=0;
+    for (var i=0; i<pending.length; i++) {
       var pred = pending[i];
       try {
-        var open=null, high=null, close=null;
-
-        if (pred.date === today) {
-          var q = quoteMap[pred.symbol];
-          if (q) {
-            var qo=parseFloat(q.open||0), qp=parseFloat(q.price||0), qh=parseFloat(q.dayHigh||q.high||qp), qv=parseFloat(q.previousClose||0);
-            if (qo<=0 && qv>0) qo=qv;
-            if (qo>0 && qp>0) { open=qo; high=Math.max(qh,qo,qp); close=qp; }
-          }
+        var open=0,high=0,close=0;
+        if (pred.date === todayStr) {
+          var q=quoteMap[pred.symbol];
+          if (q) { var qo=parseFloat(q.open||0),qp=parseFloat(q.price||0),qh=parseFloat(q.dayHigh||q.high||qp),qv=parseFloat(q.previousClose||0); if(qo<=0&&qv>0)qo=qv; if(qo>0&&qp>0){open=qo;high=Math.max(qh,qo,qp);close=qp;} }
         } else {
-          var bm = bulkMap[pred.date];
-          if (bm && bm[pred.symbol]) {
-            var row=bm[pred.symbol];
-            open=parseFloat(row.open||0); high=parseFloat(row.high||row.close||0); close=parseFloat(row.close||0);
-          }
+          var cache=(histCache[pred.symbol]||{}); var row=cache[pred.date];
+          if (row&&row.open>0){open=row.open;high=row.high;close=row.close;}
+          else { var dts=Object.keys(cache).filter(function(d){return d<=pred.date;}).sort().reverse(); if(dts.length>0){var nr=cache[dts[0]];open=nr.open;high=nr.high;close=nr.close;} }
         }
-
-        // Use saved open_price if we have it and open is missing
-        if ((!open || open<=0) && pred.open_price && parseFloat(pred.open_price)>0) open=parseFloat(pred.open_price);
-
-        if (!open || !close || open<=0 || close<=0) {
-          lg(pred.symbol+' '+pred.date+': no data — stays pending', 'db', 'warn');
-          skipped++; continue;
-        }
-
-        high = Math.max(high||0, open, close);
-        var highPct  = ((high  - open) / open) * 100;
-        var closePct = ((close - open) / open) * 100;
-        var verdict;
-        if (highPct >= pred.target_min)          verdict = 'hit';
-        else if (highPct >= pred.target_min*0.6) verdict = 'partial';
-        else if (highPct >= 1.5)                 verdict = 'partial';
-        else                                     verdict = 'miss';
-
-        if (verdict==='hit') hits++;
-        else if (verdict==='partial') partials++;
-        else misses++;
-
-        await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {
-          open_price:  parseFloat(open.toFixed(2)),
-          close_price: parseFloat(close.toFixed(2)),
-          actual_pct:  parseFloat(closePct.toFixed(2)),
-          verdict:     verdict
-        });
-        lg(pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
-      } catch(e) { lg('Error '+pred.symbol+': '+e.message, 'db', 'err'); skipped++; }
+        if (!open||open<=0||!close||close<=0){lg(pred.symbol+' '+pred.date+': no data',  'db','warn');skipped++;continue;}
+        high=Math.max(high||0,open,close);
+        var highPct=((high-open)/open)*100, closePct=((close-open)/open)*100;
+        var verdict=highPct>=pred.target_min?'hit':highPct>=pred.target_min*0.6?'partial':highPct>=1.5?'partial':'miss';
+        if(verdict==='hit')hits++; else if(verdict==='partial')partials++; else misses++;
+        await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{open_price:parseFloat(open.toFixed(2)),close_price:parseFloat(close.toFixed(2)),actual_pct:parseFloat(closePct.toFixed(2)),verdict:verdict});
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+      } catch(e){lg('Error '+pred.symbol+': '+e.message,'db','err');skipped++;}
     }
-    var total=hits+partials+misses;
-    var rate=total?Math.round((hits+partials*0.5)/total*100):0;
-    lg('EOD Complete: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' pending', 'db', 'ok');
-    if (total>0) lg('Success rate: '+rate+'%', 'db', rate>=60?'ok':'warn');
+    var total=hits+partials+misses, rate=total?Math.round((hits+partials*0.5)/total*100):0;
+    lg('EOD done: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' pending','db','ok');
+    if(total>0) lg('Success rate: '+rate+'%','db',rate>=60?'ok':'warn');
     await loadHistory();
-  } catch(e) { lg('EOD failed: '+e.message, 'db', 'err'); }
-  finally { if (!silent && btn) { btn.textContent="Verify Today's Results (4PM+)"; btn.disabled=false; } }
+  } catch(e){lg('EOD failed: '+e.message,'db','err');}
+  finally{if(!silent&&btn){btn.textContent="Verify Today's Results (4PM+)";btn.disabled=false;}}
 }
 
 // Re-verify ALL records — fixes wrong verdicts from scan-price bug
@@ -1082,148 +1054,116 @@ async function getOHLC(symbol, dateStr) {
 }
 
 async function reVerifyAll() {
-  if (!confirm('Re-fetch actual open/high/close for ALL picks using bulk EOD data. Continue?')) return;
+  if (!confirm('Re-verify ALL picks using historical data per symbol. This may take ~2 minutes. Continue?')) return;
   var btn = document.querySelector('[onclick="reVerifyAll()"]');
   if (btn) { btn.textContent = 'Re-verifying...'; btn.disabled = true; }
-  lg('RE-VERIFY ALL: Using bulk EOD endpoint (1 call per date)...', 'db', 'ok');
+
   try {
-    // Fetch ALL records
+    // STEP 1: Load all records
     var all = await dbQuery('apex_predictions?order=date.desc&limit=500&select=id,symbol,date,target_min,target_max');
     if (!all || !all.length) { lg('No records found', 'db', 'warn'); return; }
-    lg('Loaded ' + all.length + ' records across ' + new Set(all.map(function(r){return r.date;})).size + ' trading days', 'db');
-
-    // Get EST today
     var estNow = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
     var todayEst = estNow.getFullYear()+'-'+String(estNow.getMonth()+1).padStart(2,'0')+'-'+String(estNow.getDate()).padStart(2,'0');
+    lg('Loaded ' + all.length + ' records. Building symbol cache...', 'db', 'ok');
 
-    // ── STEP 1: Group records by date ──
-    var byDate = {};
-    all.forEach(function(r) {
-      if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push(r);
-    });
+    // STEP 2: Get unique symbols
+    var symbols = [];
+    all.forEach(function(r) { if (symbols.indexOf(r.symbol) === -1) symbols.push(r.symbol); });
+    lg('Unique symbols: ' + symbols.length + ' — fetching 90-day history for each (~' + Math.ceil(symbols.length*1.5) + 's)', 'db');
 
-    // ── STEP 2: For each date, fetch bulk EOD (1 API call) ──
-    var bulkCache = {}; // date -> {SYMBOL: {open,high,close}}
-    var dates = Object.keys(byDate).sort().reverse();
+    // STEP 3: Fetch historical OHLC for each unique symbol (1 call per symbol)
+    // histCache[symbol][date] = {open, high, close}
+    var histCache = {};
+    var fromDate  = new Date(Date.now() - 90*24*60*60*1000);
+    var fromStr   = fromDate.getFullYear()+'-'+String(fromDate.getMonth()+1).padStart(2,'0')+'-'+String(fromDate.getDate()).padStart(2,'0');
 
-    for (var di = 0; di < dates.length; di++) {
-      var dt = dates[di];
-      if (dt === todayEst) {
-        // Today: use individual quotes (bulk not available same day)
-        lg('Date ' + dt + ' = today, will use individual quotes per symbol', 'db');
-        bulkCache[dt] = null; // signal to use quote fallback
-      } else {
-        // Past dates: ONE bulk call returns all symbols for that day
-        try {
-          var bulkUrl = 'https://financialmodelingprep.com/stable/eod-bulk?date=' + dt + '&apikey=' + FMP;
-          var br = await fetch(bulkUrl);
-          if (!br.ok) {
-            lg('Bulk EOD HTTP ' + br.status + ' for ' + dt, 'db', 'warn');
-            bulkCache[dt] = null;
-            continue;
-          }
-          var bd = await br.json();
-          var barr = Array.isArray(bd) ? bd : (bd.data || []);
-          if (barr.length === 0) {
-            // Try alternate field name
-            var keys = Object.keys(bd||{});
-            for (var ki=0; ki<keys.length; ki++) {
-              if (Array.isArray(bd[keys[ki]])) { barr = bd[keys[ki]]; break; }
-            }
-          }
-          // Build symbol lookup map
-          var symMap = {};
-          barr.forEach(function(row) {
-            var sym = row.symbol || row.ticker;
-            if (sym) symMap[sym] = row;
-          });
-          if (barr.length === 0) {
-            // Bulk returned empty — likely free tier restriction or no data
-            // Set null to trigger per-symbol fallback
-            bulkCache[dt] = null;
-            lg('Bulk EOD ' + dt + ': 0 stocks (may need paid tier) → will use individual calls', 'db', 'warn');
-          } else {
-            bulkCache[dt] = symMap;
-            lg('Bulk EOD ' + dt + ': ' + barr.length + ' stocks loaded ✓', 'db', 'ok');
-          }
-        } catch(be) {
-          lg('Bulk EOD error ' + dt + ': ' + be.message, 'db', 'err');
-          bulkCache[dt] = null;
+    for (var si = 0; si < symbols.length; si++) {
+      var sym = symbols[si];
+      try {
+        var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=' + sym + '&from=' + fromStr + '&to=' + todayEst + '&apikey=' + FMP;
+        var r   = await fetch(url);
+        if (!r.ok) {
+          lg(sym + ': HTTP ' + r.status, 'db', 'warn');
+          histCache[sym] = {};
+          await sleep(1500);
+          continue;
         }
-        await sleep(300); // small delay between date calls
+        var d    = await r.json();
+        var hist = d.historical || (Array.isArray(d) ? d : []);
+        // Handle other wrapper formats
+        if (!hist.length) {
+          var ks = Object.keys(d || {});
+          for (var ki = 0; ki < ks.length; ki++) {
+            if (Array.isArray(d[ks[ki]])) { hist = d[ks[ki]]; break; }
+          }
+        }
+        // Index by date string
+        var byDate = {};
+        hist.forEach(function(row) {
+          if (row.date) byDate[row.date] = { open: parseFloat(row.open), high: parseFloat(row.high || row.close), close: parseFloat(row.close) };
+        });
+        histCache[sym] = byDate;
+        lg(sym + ': ' + hist.length + ' days loaded (' + Object.keys(byDate).slice(0,3).join(', ') + '...)', 'db', hist.length > 0 ? 'ok' : 'warn');
+      } catch(e) {
+        lg(sym + ' error: ' + e.message, 'db', 'err');
+        histCache[sym] = {};
       }
+      await sleep(1200); // 1.2s between calls — safe for free tier
     }
 
-    // ── STEP 3: For each record, look up OHLC from cache or quote ──
-    var hits=0, partials=0, misses=0, skipped=0;
+    // STEP 4: For today's picks, get live quote (batch call)
+    var todaySymbols = all.filter(function(r){ return r.date === todayEst; }).map(function(r){ return r.symbol; });
+    var quoteMap = {};
+    if (todaySymbols.length > 0) {
+      try {
+        var qr  = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + todaySymbols.join(',') + '&apikey=' + FMP);
+        var qd  = await qr.json();
+        var qarr = Array.isArray(qd) ? qd : [qd];
+        qarr.forEach(function(q) { if (q && q.symbol) quoteMap[q.symbol] = q; });
+        lg('Today batch quote: ' + Object.keys(quoteMap).length + ' symbols', 'db', 'ok');
+      } catch(qe) { lg('Today quote error: ' + qe.message, 'db', 'warn'); }
+    }
 
+    // STEP 5: Verify each record from cache
+    var hits=0, partials=0, misses=0, skipped=0;
     for (var i = 0; i < all.length; i++) {
       var pred = all[i];
       try {
-        var open=null, high=null, close=null, src='';
+        var open=0, high=0, close=0, src='';
 
-        var cache = bulkCache[pred.date];
-
-        // Try bulk cache first
-        if (cache && cache[pred.symbol]) {
-          var row = cache[pred.symbol];
-          open  = parseFloat(row.open  || 0);
-          high  = parseFloat(row.high  || row.close || 0);
-          close = parseFloat(row.close || 0);
-          src   = 'bulk:' + pred.date;
-        }
-
-        // If not in bulk cache (null = bulk failed, or symbol missing), 
-        // try individual quote (works for today AND recent days)
-        if (!open || open <= 0) {
-          try {
-            var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP);
-            if (qr.ok) {
-              var qd = await qr.json();
-              var q  = Array.isArray(qd) ? qd[0] : qd;
-              if (q && q.symbol) {
-                var qo = parseFloat(q.open || 0);
-                var qp = parseFloat(q.price || 0);
-                var qh = parseFloat(q.dayHigh || q.high || qp);
-                var qv = parseFloat(q.previousClose || 0);
-                if (qo <= 0 && qv > 0) qo = qv;
-                if (qo > 0 && qp > 0) { open=qo; high=Math.max(qh,qo,qp); close=qp; src='quote'; }
-              }
+        if (pred.date === todayEst) {
+          // Today: use quote
+          var q = quoteMap[pred.symbol];
+          if (q) {
+            var qo=parseFloat(q.open||0), qp=parseFloat(q.price||0), qh=parseFloat(q.dayHigh||q.high||qp), qv=parseFloat(q.previousClose||0);
+            if (qo<=0 && qv>0) qo=qv;
+            if (qo>0 && qp>0) { open=qo; high=Math.max(qh,qo,qp); close=qp; src='quote'; }
+          }
+        } else {
+          // Past: use historical cache
+          var cache = histCache[pred.symbol] || {};
+          var row   = cache[pred.date];
+          if (row && row.open > 0) {
+            open=row.open; high=row.high; close=row.close; src='hist';
+          } else {
+            // Date not in cache — find nearest past trading day
+            var dates = Object.keys(cache).filter(function(d){ return d <= pred.date; }).sort().reverse();
+            if (dates.length > 0) {
+              var nearest = cache[dates[0]];
+              open=nearest.open; high=nearest.high; close=nearest.close;
+              src='hist:nearest(' + dates[0] + ')';
+              if (dates[0] !== pred.date) lg(pred.symbol + ': using nearest date ' + dates[0] + ' for ' + pred.date, 'db', 'warn');
             }
-          } catch(qe) {}
-          await sleep(150);
+          }
         }
 
-        if (!open || !close || open <= 0 || close <= 0) {
-          // Last resort: individual historical call
-          try {
-            var dParts = pred.date.split('-');
-            var dLocal = new Date(parseInt(dParts[0]), parseInt(dParts[1])-1, parseInt(dParts[2]));
-            var fromDt = new Date(dLocal.getTime()-5*24*60*60*1000);
-            var toDt   = new Date(dLocal.getTime()+1*24*60*60*1000);
-            var fStr   = fromDt.getFullYear()+'-'+String(fromDt.getMonth()+1).padStart(2,'0')+'-'+String(fromDt.getDate()).padStart(2,'0');
-            var tStr   = toDt.getFullYear()  +'-'+String(toDt.getMonth()+1).padStart(2,'0')  +'-'+String(toDt.getDate()).padStart(2,'0');
-            var hr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+fStr+'&to='+tStr+'&apikey='+FMP);
-            if (hr.ok) {
-              var hd   = await hr.json();
-              var harr = hd.historical || (Array.isArray(hd) ? hd : []);
-              if (!harr.length) { var ks=Object.keys(hd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(hd[ks[ki]])){harr=hd[ks[ki]];break;}} }
-              var day = harr.find(function(x){return x.date===pred.date;}) || harr.filter(function(x){return x.date<=pred.date;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
-              if (day && parseFloat(day.open||0) > 0) { open=parseFloat(day.open); high=parseFloat(day.high||day.close); close=parseFloat(day.close); src='hist:'+day.date; }
-            }
-          } catch(he) {}
-          await sleep(200);
-        }
-
-        if (!open || !close || open <= 0) {
-          // All sources failed — leave as pending, log for investigation
-          lg(pred.symbol+' '+pred.date+': all sources exhausted, stays pending', 'db', 'warn');
+        if (!open || open <= 0 || !close || close <= 0) {
+          lg(pred.symbol + ' ' + pred.date + ': no data in cache — stays pending', 'db', 'warn');
           skipped++;
           continue;
         }
 
-        high = Math.max(high||0, open, close);
+        high = Math.max(high || 0, open, close);
         var highPct  = ((high  - open) / open) * 100;
         var closePct = ((close - open) / open) * 100;
         var verdict;
@@ -1236,23 +1176,23 @@ async function reVerifyAll() {
         else if (verdict==='partial') partials++;
         else misses++;
 
-        await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {
+        await dbQuery('apex_predictions?id=eq.' + pred.id, 'PATCH', {
           open_price:  parseFloat(open.toFixed(2)),
           close_price: parseFloat(close.toFixed(2)),
           actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
         });
-        lg('['+src+'] '+pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg('[' + src + '] ' + pred.symbol + ' ' + pred.date + ': open=$' + f2(open) + ' high=$' + f2(high) + ' (+' + f2(highPct) + '%) → ' + verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
 
-      } catch(e) { lg('Error '+pred.symbol+': '+e.message, 'db', 'err'); skipped++; }
+      } catch(e) { lg('Error ' + pred.symbol + ': ' + e.message, 'db', 'err'); skipped++; }
     }
 
     var total = hits+partials+misses;
     var rate  = total ? Math.round((hits+partials*0.5)/total*100) : 0;
-    lg('COMPLETE: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' still pending', 'db', 'ok');
-    lg('Success rate: '+rate+'% ('+total+' verified)', 'db', rate>=60?'ok':'warn');
+    lg('COMPLETE: ' + hits + ' hits, ' + partials + ' partial, ' + misses + ' misses, ' + skipped + ' pending', 'db', 'ok');
+    if (total > 0) lg('Success rate: ' + rate + '%', 'db', rate >= 60 ? 'ok' : 'warn');
     await loadHistory();
-  } catch(e) { lg('Re-verify failed: '+e.message, 'db', 'err'); }
+  } catch(e) { lg('Re-verify failed: ' + e.message, 'db', 'err'); }
   finally { if (btn) { btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
 }
 
