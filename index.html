@@ -832,8 +832,8 @@ function renderHistory(rows) {
   }
   var html='';
   rows.forEach(function(r){
-    var vc={hit:'v-hit',miss:'v-miss',partial:'v-partial',pending:'v-pending',unverifiable:'v-unverifiable'}[r.verdict]||'v-pending';
-    var vt={hit:'Hit',miss:'Miss',partial:'Partial',pending:'Pending',unverifiable:'N/A'}[r.verdict]||'Pending';
+    var vc={hit:'v-hit',miss:'v-miss',partial:'v-partial',pending:'v-pending',unverifiable:'v-pending'}[r.verdict]||'v-pending';
+    var vt={hit:'Hit',miss:'Miss',partial:'Partial',pending:'Pending',unverifiable:'Pending'}[r.verdict]||'Pending';
     var ac=r.actual_pct>=2?'up':r.actual_pct<0?'dn':'';
     var as=r.actual_pct!=null?(r.actual_pct>=0?'+':'')+f2(r.actual_pct)+'%':'--';
     html+='<tr><td>'+r.date+'</td><td class="sym">'+r.symbol+'</td>'+
@@ -1077,7 +1077,7 @@ async function getOHLC(symbol, dateStr) {
     }
   }
 
-  lg(symbol + ' ' + dateStr + ': ALL sources failed — marking unverifiable', 'db', 'warn');
+  lg(symbol + ' ' + dateStr + ': all price sources failed — check API limit', 'db', 'warn');
   return null;
 }
 
@@ -1138,8 +1138,15 @@ async function reVerifyAll() {
             var sym = row.symbol || row.ticker;
             if (sym) symMap[sym] = row;
           });
-          bulkCache[dt] = symMap;
-          lg('Bulk EOD ' + dt + ': ' + barr.length + ' stocks loaded', 'db', barr.length > 0 ? 'ok' : 'warn');
+          if (barr.length === 0) {
+            // Bulk returned empty — likely free tier restriction or no data
+            // Set null to trigger per-symbol fallback
+            bulkCache[dt] = null;
+            lg('Bulk EOD ' + dt + ': 0 stocks (may need paid tier) → will use individual calls', 'db', 'warn');
+          } else {
+            bulkCache[dt] = symMap;
+            lg('Bulk EOD ' + dt + ': ' + barr.length + ' stocks loaded ✓', 'db', 'ok');
+          }
         } catch(be) {
           lg('Bulk EOD error ' + dt + ': ' + be.message, 'db', 'err');
           bulkCache[dt] = null;
@@ -1157,8 +1164,19 @@ async function reVerifyAll() {
         var open=null, high=null, close=null, src='';
 
         var cache = bulkCache[pred.date];
-        if (cache === null) {
-          // Today or bulk failed — use individual quote
+
+        // Try bulk cache first
+        if (cache && cache[pred.symbol]) {
+          var row = cache[pred.symbol];
+          open  = parseFloat(row.open  || 0);
+          high  = parseFloat(row.high  || row.close || 0);
+          close = parseFloat(row.close || 0);
+          src   = 'bulk:' + pred.date;
+        }
+
+        // If not in bulk cache (null = bulk failed, or symbol missing), 
+        // try individual quote (works for today AND recent days)
+        if (!open || open <= 0) {
           try {
             var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + pred.symbol + '&apikey=' + FMP);
             if (qr.ok) {
@@ -1174,13 +1192,7 @@ async function reVerifyAll() {
               }
             }
           } catch(qe) {}
-        } else if (cache && cache[pred.symbol]) {
-          // Found in bulk cache
-          var row = cache[pred.symbol];
-          open  = parseFloat(row.open  || 0);
-          high  = parseFloat(row.high  || row.close || 0);
-          close = parseFloat(row.close || 0);
-          src   = 'bulk:' + pred.date;
+          await sleep(150);
         }
 
         if (!open || !close || open <= 0 || close <= 0) {
@@ -1205,9 +1217,8 @@ async function reVerifyAll() {
         }
 
         if (!open || !close || open <= 0) {
-          // Mark unverifiable after exhausting all options
-          await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {verdict:'unverifiable'});
-          lg(pred.symbol+' '+pred.date+': no data from any source → unverifiable', 'db', 'warn');
+          // All sources failed — leave as pending, log for investigation
+          lg(pred.symbol+' '+pred.date+': all sources exhausted, stays pending', 'db', 'warn');
           skipped++;
           continue;
         }
@@ -1238,7 +1249,7 @@ async function reVerifyAll() {
 
     var total = hits+partials+misses;
     var rate  = total ? Math.round((hits+partials*0.5)/total*100) : 0;
-    lg('COMPLETE: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' unverifiable', 'db', 'ok');
+    lg('COMPLETE: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' still pending', 'db', 'ok');
     lg('Success rate: '+rate+'% ('+total+' verified)', 'db', rate>=60?'ok':'warn');
     await loadHistory();
   } catch(e) { lg('Re-verify failed: '+e.message, 'db', 'err'); }
