@@ -1054,146 +1054,148 @@ async function getOHLC(symbol, dateStr) {
 }
 
 async function reVerifyAll() {
-  if (!confirm('Re-verify ALL picks using historical data per symbol. This may take ~2 minutes. Continue?')) return;
+  if (!confirm('Re-verify pending picks. Fetches history per symbol with 3s gaps to avoid rate limits (~3 min). Continue?')) return;
   var btn = document.querySelector('[onclick="reVerifyAll()"]');
   if (btn) { btn.textContent = 'Re-verifying...'; btn.disabled = true; }
 
   try {
-    // STEP 1: Load all records
-    var all = await dbQuery('apex_predictions?order=date.desc&limit=500&select=id,symbol,date,target_min,target_max');
-    if (!all || !all.length) { lg('No records found', 'db', 'warn'); return; }
-    var estNow = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-    var todayEst = estNow.getFullYear()+'-'+String(estNow.getMonth()+1).padStart(2,'0')+'-'+String(estNow.getDate()).padStart(2,'0');
-    lg('Loaded ' + all.length + ' records. Building symbol cache...', 'db', 'ok');
+    // Only fetch PENDING records — no need to re-process hit/miss/partial
+    var pending = await dbQuery('apex_predictions?verdict=eq.pending&order=date.desc&limit=500&select=id,symbol,date,target_min,target_max');
+    if (!pending || !pending.length) {
+      lg('No pending records found — all picks already verified!', 'db', 'ok');
+      await loadHistory();
+      return;
+    }
 
-    // STEP 2: Get unique symbols
+    var estNow  = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+    var todayEst= estNow.getFullYear()+'-'+String(estNow.getMonth()+1).padStart(2,'0')+'-'+String(estNow.getDate()).padStart(2,'0');
+    lg('Pending records: ' + pending.length + ' across dates ' +
+       [...new Set(pending.map(function(r){return r.date;}))].sort().join(', '), 'db');
+
+    // Unique symbols in pending records only
     var symbols = [];
-    all.forEach(function(r) { if (symbols.indexOf(r.symbol) === -1) symbols.push(r.symbol); });
-    lg('Unique symbols: ' + symbols.length + ' — fetching 90-day history for each (~' + Math.ceil(symbols.length*1.5) + 's)', 'db');
+    pending.forEach(function(r){ if(symbols.indexOf(r.symbol)===-1) symbols.push(r.symbol); });
+    lg('Unique symbols to fetch: ' + symbols.length + ' (3s apart, ~' + (symbols.length*3) + 's total)', 'db');
 
-    // STEP 3: Fetch historical OHLC for each unique symbol (1 call per symbol)
-    // histCache[symbol][date] = {open, high, close}
+    // Build histCache using fetchHistorical — the PROVEN function from scan
+    // fetchHistorical returns 5yr daily OHLC and is confirmed working
     var histCache = {};
-    var fromDate  = new Date(Date.now() - 90*24*60*60*1000);
-    var fromStr   = fromDate.getFullYear()+'-'+String(fromDate.getMonth()+1).padStart(2,'0')+'-'+String(fromDate.getDate()).padStart(2,'0');
-
     for (var si = 0; si < symbols.length; si++) {
       var sym = symbols[si];
-      try {
-        var url = 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=' + sym + '&from=' + fromStr + '&to=' + todayEst + '&apikey=' + FMP;
-        var r   = await fetch(url);
-        if (!r.ok) {
-          lg(sym + ': HTTP ' + r.status, 'db', 'warn');
-          histCache[sym] = {};
-          await sleep(1500);
-          continue;
-        }
-        var d    = await r.json();
-        var hist = d.historical || (Array.isArray(d) ? d : []);
-        // Handle other wrapper formats
-        if (!hist.length) {
-          var ks = Object.keys(d || {});
-          for (var ki = 0; ki < ks.length; ki++) {
-            if (Array.isArray(d[ks[ki]])) { hist = d[ks[ki]]; break; }
-          }
-        }
-        // Index by date string
+      lg('Fetching history ' + (si+1) + '/' + symbols.length + ': ' + sym + '...', 'db');
+      var hist = await fetchHistorical(sym);  // reuse proven working function
+      if (hist && hist.length > 0) {
         var byDate = {};
-        hist.forEach(function(row) {
-          if (row.date) byDate[row.date] = { open: parseFloat(row.open), high: parseFloat(row.high || row.close), close: parseFloat(row.close) };
+        hist.forEach(function(row){
+          if (row.date) byDate[row.date] = {
+            open:  parseFloat(row.open  || 0),
+            high:  parseFloat(row.high  || row.close || 0),
+            close: parseFloat(row.close || 0)
+          };
         });
         histCache[sym] = byDate;
-        lg(sym + ': ' + hist.length + ' days loaded (' + Object.keys(byDate).slice(0,3).join(', ') + '...)', 'db', hist.length > 0 ? 'ok' : 'warn');
-      } catch(e) {
-        lg(sym + ' error: ' + e.message, 'db', 'err');
-        histCache[sym] = {};
+        lg(sym + ': ' + hist.length + ' days. Sample dates: ' + Object.keys(byDate).slice(0,3).join(', '), 'db', 'ok');
+      } else {
+        // Empty response = likely rate limited — wait longer and retry once
+        lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
+        await sleep(10000);
+        var hist2 = await fetchHistorical(sym);
+        if (hist2 && hist2.length > 0) {
+          var byDate2 = {};
+          hist2.forEach(function(row){
+            if(row.date) byDate2[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)};
+          });
+          histCache[sym] = byDate2;
+          lg(sym + ': retry OK — ' + hist2.length + ' days', 'db', 'ok');
+        } else {
+          histCache[sym] = {};
+          lg(sym + ': no data after retry — may not be on FMP free tier', 'db', 'warn');
+        }
       }
-      await sleep(1200); // 1.2s between calls — safe for free tier
+      // 3 second gap between symbols — respects FMP free tier rate limit
+      if (si < symbols.length - 1) await sleep(3000);
     }
 
-    // STEP 4: For today's picks, get live quote (batch call)
-    var todaySymbols = all.filter(function(r){ return r.date === todayEst; }).map(function(r){ return r.symbol; });
+    // Today's picks: use batch quote (single call)
     var quoteMap = {};
-    if (todaySymbols.length > 0) {
+    var todayPending = pending.filter(function(p){ return p.date === todayEst; });
+    if (todayPending.length > 0) {
+      var todaySyms = todayPending.map(function(p){ return p.symbol; });
       try {
-        var qr  = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + todaySymbols.join(',') + '&apikey=' + FMP);
-        var qd  = await qr.json();
-        var qarr = Array.isArray(qd) ? qd : [qd];
-        qarr.forEach(function(q) { if (q && q.symbol) quoteMap[q.symbol] = q; });
-        lg('Today batch quote: ' + Object.keys(quoteMap).length + ' symbols', 'db', 'ok');
-      } catch(qe) { lg('Today quote error: ' + qe.message, 'db', 'warn'); }
+        var qr = await fetch('https://financialmodelingprep.com/stable/quote?symbol=' + todaySyms.join(',') + '&apikey=' + FMP);
+        if (qr.ok) {
+          var qd = await qr.json();
+          (Array.isArray(qd)?qd:[qd]).forEach(function(q){ if(q&&q.symbol) quoteMap[q.symbol]=q; });
+          lg("Today's batch quote: " + Object.keys(quoteMap).length + " symbols", 'db', 'ok');
+        }
+      } catch(qe) { lg('Quote error: '+qe.message, 'db', 'warn'); }
     }
 
-    // STEP 5: Verify each record from cache
+    // Verify each pending record from cache
     var hits=0, partials=0, misses=0, skipped=0;
-    for (var i = 0; i < all.length; i++) {
-      var pred = all[i];
+    for (var i = 0; i < pending.length; i++) {
+      var pred = pending[i];
       try {
-        var open=0, high=0, close=0, src='';
+        var open=0, high=0, close=0;
 
         if (pred.date === todayEst) {
-          // Today: use quote
           var q = quoteMap[pred.symbol];
           if (q) {
             var qo=parseFloat(q.open||0), qp=parseFloat(q.price||0), qh=parseFloat(q.dayHigh||q.high||qp), qv=parseFloat(q.previousClose||0);
             if (qo<=0 && qv>0) qo=qv;
-            if (qo>0 && qp>0) { open=qo; high=Math.max(qh,qo,qp); close=qp; src='quote'; }
+            if (qo>0 && qp>0) { open=qo; high=Math.max(qh,qo,qp); close=qp; }
           }
         } else {
-          // Past: use historical cache
           var cache = histCache[pred.symbol] || {};
           var row   = cache[pred.date];
           if (row && row.open > 0) {
-            open=row.open; high=row.high; close=row.close; src='hist';
+            open=row.open; high=row.high; close=row.close;
           } else {
-            // Date not in cache — find nearest past trading day
-            var dates = Object.keys(cache).filter(function(d){ return d <= pred.date; }).sort().reverse();
-            if (dates.length > 0) {
-              var nearest = cache[dates[0]];
-              open=nearest.open; high=nearest.high; close=nearest.close;
-              src='hist:nearest(' + dates[0] + ')';
-              if (dates[0] !== pred.date) lg(pred.symbol + ': using nearest date ' + dates[0] + ' for ' + pred.date, 'db', 'warn');
+            // Find nearest past trading day in cache
+            var dts = Object.keys(cache).filter(function(d){ return d <= pred.date; }).sort().reverse();
+            if (dts.length > 0) {
+              var nr = cache[dts[0]];
+              open=nr.open; high=nr.high; close=nr.close;
+              if (dts[0] !== pred.date) lg(pred.symbol+': using nearest date '+dts[0]+' for '+pred.date, 'db', 'warn');
             }
           }
         }
 
         if (!open || open <= 0 || !close || close <= 0) {
-          lg(pred.symbol + ' ' + pred.date + ': no data in cache — stays pending', 'db', 'warn');
-          skipped++;
-          continue;
+          lg(pred.symbol+' '+pred.date+': no data — stays pending', 'db', 'warn');
+          skipped++; continue;
         }
 
-        high = Math.max(high || 0, open, close);
+        high = Math.max(high||0, open, close);
         var highPct  = ((high  - open) / open) * 100;
         var closePct = ((close - open) / open) * 100;
-        var verdict;
-        if (highPct >= pred.target_min)          verdict = 'hit';
-        else if (highPct >= pred.target_min*0.6) verdict = 'partial';
-        else if (highPct >= 1.5)                 verdict = 'partial';
-        else                                     verdict = 'miss';
+        var verdict  = highPct >= pred.target_min ? 'hit' :
+                       highPct >= pred.target_min*0.6 ? 'partial' :
+                       highPct >= 1.5 ? 'partial' : 'miss';
 
-        if (verdict==='hit') hits++;
-        else if (verdict==='partial') partials++;
+        if(verdict==='hit') hits++;
+        else if(verdict==='partial') partials++;
         else misses++;
 
-        await dbQuery('apex_predictions?id=eq.' + pred.id, 'PATCH', {
+        await dbQuery('apex_predictions?id=eq.'+pred.id, 'PATCH', {
           open_price:  parseFloat(open.toFixed(2)),
           close_price: parseFloat(close.toFixed(2)),
           actual_pct:  parseFloat(closePct.toFixed(2)),
           verdict:     verdict
         });
-        lg('[' + src + '] ' + pred.symbol + ' ' + pred.date + ': open=$' + f2(open) + ' high=$' + f2(high) + ' (+' + f2(highPct) + '%) → ' + verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(), 'db', verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
 
-      } catch(e) { lg('Error ' + pred.symbol + ': ' + e.message, 'db', 'err'); skipped++; }
+      } catch(e){ lg('Error '+pred.symbol+': '+e.message,'db','err'); skipped++; }
     }
 
     var total = hits+partials+misses;
     var rate  = total ? Math.round((hits+partials*0.5)/total*100) : 0;
-    lg('COMPLETE: ' + hits + ' hits, ' + partials + ' partial, ' + misses + ' misses, ' + skipped + ' pending', 'db', 'ok');
-    if (total > 0) lg('Success rate: ' + rate + '%', 'db', rate >= 60 ? 'ok' : 'warn');
+    lg('COMPLETE: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' still pending','db','ok');
+    if (total > 0) lg('Success rate: '+rate+'%','db',rate>=60?'ok':'warn');
     await loadHistory();
-  } catch(e) { lg('Re-verify failed: ' + e.message, 'db', 'err'); }
-  finally { if (btn) { btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
+
+  } catch(e){ lg('Re-verify failed: '+e.message,'db','err'); }
+  finally{ if(btn){ btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
 }
 
 // Past pending verification
