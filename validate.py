@@ -38,6 +38,17 @@ def validate(content):
     if js.count('`') % 2 != 0:
         errors.append(f"Odd backtick count ({js.count('`')}) — unclosed template literal")
 
+    # ── 3b. No await in non-async functions (SyntaxError killer) ────
+    for _m in re.finditer(r'(?<!async )function (\w+)\s*\([^)]*\)\s*\{', js):
+        _fn, _fs = _m.group(1), _m.start()
+        _d, _st, _e = 0, False, _fs
+        for _ii, _cc in enumerate(js[_fs:], _fs):
+            if _cc=='{': _d+=1; _st=True
+            elif _cc=='}': _d-=1
+            if _st and _d==0: _e=_ii+1; break
+        if 'await ' in js[_fs:_e]:
+            errors.append(f"Non-async function '{_fn}' uses await — causes SyntaxError on load")
+
     # ── 4. Required functions ─────────────────────────────────
     required = [
         ('async function runScan()',     'runScan'),
