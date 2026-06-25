@@ -930,7 +930,7 @@ async function runEODVerification(silent) {
 
     for (var si=0; si<pastSyms.length; si++) {
       var sym = pastSyms[si];
-      lg('Fetching history ' + (si+1) + '/' + pastSyms.length + ': ' + sym, 'db');
+      lg('Fetching ' + (si+1) + '/' + pastSyms.length + ': ' + sym, 'db');
       try {
         var hr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
         if (hr.ok) {
@@ -938,8 +938,7 @@ async function runEODVerification(silent) {
           var hist = hd.historical||(Array.isArray(hd)?hd:[]);
           if (!hist.length) { var ks=Object.keys(hd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(hd[ks[ki]])){hist=hd[ks[ki]];break;}} }
           if (!hist.length) {
-            // Empty = likely rate limited (FMP returns HTTP 200 + empty array on rate limit)
-            lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
+            lg(sym + ': empty (rate limit?), retrying after 10s...', 'db', 'warn');
             await sleep(10000);
             var hr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
             if (hr2.ok) {
@@ -1132,42 +1131,37 @@ async function reVerifyAll() {
     pending.forEach(function(r){ if(symbols.indexOf(r.symbol)===-1) symbols.push(r.symbol); });
     lg('Unique symbols to fetch: ' + symbols.length + ' (3s apart, ~' + (symbols.length*3) + 's total)', 'db');
 
-    // Build histCache using fetchHistorical — the PROVEN function from scan
-    // fetchHistorical returns 5yr daily OHLC and is confirmed working
+    // Build histCache: 90-day direct fetch per unique symbol
+    // NOTE: fetchHistorical requests 5yr of data which exceeds FMP free-tier row limit
+    // and silently returns empty array — must use narrow date range for verification
+    var reVFromDt = new Date(Date.now()-90*24*60*60*1000);
+    var reVFrom   = reVFromDt.getFullYear()+'-'+String(reVFromDt.getMonth()+1).padStart(2,'0')+'-'+String(reVFromDt.getDate()).padStart(2,'0');
     var histCache = {};
     for (var si = 0; si < symbols.length; si++) {
       var sym = symbols[si];
-      lg('Fetching history ' + (si+1) + '/' + symbols.length + ': ' + sym + '...', 'db');
-      var hist = await fetchHistorical(sym);  // reuse proven working function
-      if (hist && hist.length > 0) {
-        var byDate = {};
-        hist.forEach(function(row){
-          if (row.date) byDate[row.date] = {
-            open:  parseFloat(row.open  || 0),
-            high:  parseFloat(row.high  || row.close || 0),
-            close: parseFloat(row.close || 0)
-          };
-        });
-        histCache[sym] = byDate;
-        lg(sym + ': ' + hist.length + ' days. Sample dates: ' + Object.keys(byDate).slice(0,3).join(', '), 'db', 'ok');
-      } else {
-        // Empty response = likely rate limited — wait longer and retry once
-        lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
-        await sleep(10000);
-        var hist2 = await fetchHistorical(sym);
-        if (hist2 && hist2.length > 0) {
-          var byDate2 = {};
-          hist2.forEach(function(row){
-            if(row.date) byDate2[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)};
-          });
-          histCache[sym] = byDate2;
-          lg(sym + ': retry OK — ' + hist2.length + ' days', 'db', 'ok');
-        } else {
-          histCache[sym] = {};
-          lg(sym + ': no data after retry — may not be on FMP free tier', 'db', 'warn');
+      lg('Fetching 90d ' + (si+1) + '/' + symbols.length + ': ' + sym, 'db');
+      try {
+        var rvr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+reVFrom+'&to='+todayEst+'&apikey='+FMP);
+        if (rvr.ok) {
+          var rvd = await rvr.json();
+          var rvhist = rvd.historical||(Array.isArray(rvd)?rvd:[]);
+          if (!rvhist.length) { var rvks=Object.keys(rvd||{}); for(var rki=0;rki<rvks.length;rki++){if(Array.isArray(rvd[rvks[rki]])){rvhist=rvd[rvks[rki]];break;}} }
+          if (!rvhist.length) {
+            lg(sym + ': empty (rate limit?), retrying after 10s...', 'db', 'warn');
+            await sleep(10000);
+            var rvr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+reVFrom+'&to='+todayEst+'&apikey='+FMP);
+            if (rvr2.ok) {
+              var rvd2 = await rvr2.json();
+              rvhist = rvd2.historical||(Array.isArray(rvd2)?rvd2:[]);
+              if (!rvhist.length) { var rvks2=Object.keys(rvd2||{}); for(var rki2=0;rki2<rvks2.length;rki2++){if(Array.isArray(rvd2[rvks2[rki2]])){rvhist=rvd2[rvks2[rki2]];break;}} }
+            }
+          }
+          var byDate = {};
+          rvhist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
+          histCache[sym] = byDate;
+          lg(sym + ': ' + rvhist.length + ' days' + (rvhist.length>0?' ('+Object.keys(byDate).slice(0,2).join(', ')+')':''), 'db', rvhist.length>0?'ok':'warn');
         }
-      }
-      // 3 second gap between symbols — respects FMP free tier rate limit
+      } catch(rve) { lg(sym + ' fetch error: '+rve.message,'db','err'); histCache[sym]={}; }
       if (si < symbols.length - 1) await sleep(3000);
     }
 
@@ -1253,19 +1247,19 @@ async function reVerifyAll() {
   finally{ if(btn){ btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
 }
 
-// Past pending verification — batched by unique symbol to avoid FMP rate limits
+// Past pending verification
 async function runVerification() {
   var estTmp = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   var today  = estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
-  var fromDt = new Date(Date.now()-90*24*60*60*1000);
-  var fromStr= fromDt.getFullYear()+'-'+String(fromDt.getMonth()+1).padStart(2,'0')+'-'+String(fromDt.getDate()).padStart(2,'0');
-  lg('Verifying past pending predictions (batched by symbol)...','db');
+  var pvFromDt = new Date(Date.now()-90*24*60*60*1000);
+  var pvFrom   = pvFromDt.getFullYear()+'-'+String(pvFromDt.getMonth()+1).padStart(2,'0')+'-'+String(pvFromDt.getDate()).padStart(2,'0');
+  lg('Verifying past pending (batched 90-day fetch)...','db');
   try {
     var pending = await dbQuery('apex_predictions?verdict=eq.pending&date=lt.'+today+'&select=id,symbol,date,target_min,target_max');
     if (!pending || !pending.length) { lg('No past pending predictions','db'); return; }
     lg('Found ' + pending.length + ' past pending picks', 'db');
 
-    // Unique symbols — batch fetch, not per-record (per-record hits rate limits)
+    // Unique symbols — one 90-day fetch per symbol, not one call per record
     var symbols = [];
     pending.forEach(function(p){ if(symbols.indexOf(p.symbol)===-1) symbols.push(p.symbol); });
     lg('Unique symbols: ' + symbols.length + ' (3s apart)', 'db');
@@ -1273,30 +1267,29 @@ async function runVerification() {
     var histCache = {};
     for (var si=0; si<symbols.length; si++) {
       var sym = symbols[si];
-      lg('Fetching ' + (si+1) + '/' + symbols.length + ': ' + sym, 'db');
+      lg('Fetching 90d ' + (si+1) + '/' + symbols.length + ': ' + sym, 'db');
       try {
-        var r = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+today+'&apikey='+FMP);
-        if (r.ok) {
-          var d = await r.json();
-          var hist = d.historical||(Array.isArray(d)?d:[]);
-          if (!hist.length) { var ks=Object.keys(d||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(d[ks[ki]])){hist=d[ks[ki]];break;}} }
-          if (!hist.length) {
-            // Empty = FMP rate limit (HTTP 200 + empty array) — retry after 10s
+        var pvr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+pvFrom+'&to='+today+'&apikey='+FMP);
+        if (pvr.ok) {
+          var pvd = await pvr.json();
+          var pvhist = pvd.historical||(Array.isArray(pvd)?pvd:[]);
+          if (!pvhist.length) { var pvks=Object.keys(pvd||{}); for(var pki=0;pki<pvks.length;pki++){if(Array.isArray(pvd[pvks[pki]])){pvhist=pvd[pvks[pki]];break;}} }
+          if (!pvhist.length) {
             lg(sym + ': empty (rate limit?), retrying after 10s...', 'db', 'warn');
             await sleep(10000);
-            var r2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+today+'&apikey='+FMP);
-            if (r2.ok) {
-              var d2 = await r2.json();
-              hist = d2.historical||(Array.isArray(d2)?d2:[]);
-              if (!hist.length) { var ks2=Object.keys(d2||{}); for(var ki2=0;ki2<ks2.length;ki2++){if(Array.isArray(d2[ks2[ki2]])){hist=d2[ks2[ki2]];break;}} }
+            var pvr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+pvFrom+'&to='+today+'&apikey='+FMP);
+            if (pvr2.ok) {
+              var pvd2 = await pvr2.json();
+              pvhist = pvd2.historical||(Array.isArray(pvd2)?pvd2:[]);
+              if (!pvhist.length) { var pvks2=Object.keys(pvd2||{}); for(var pki2=0;pki2<pvks2.length;pki2++){if(Array.isArray(pvd2[pvks2[pki2]])){pvhist=pvd2[pvks2[pki2]];break;}} }
             }
           }
           var byDate = {};
-          hist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
+          pvhist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
           histCache[sym] = byDate;
-          lg(sym + ': ' + hist.length + ' days', 'db', hist.length>0?'ok':'warn');
+          lg(sym + ': ' + pvhist.length + ' days', 'db', pvhist.length>0?'ok':'warn');
         }
-      } catch(e) { lg(sym + ' error: '+e.message,'db','err'); histCache[sym]={}; }
+      } catch(pve) { lg(sym + ' error: '+pve.message,'db','err'); histCache[sym]={}; }
       if (si < symbols.length - 1) await sleep(3000);
     }
 
@@ -1307,19 +1300,15 @@ async function runVerification() {
         var cache = histCache[pred.symbol] || {};
         var row   = cache[pred.date];
         if (!row) {
-          // Exact date missing — find nearest prior trading day
-          var dts = Object.keys(cache).filter(function(d){ return d <= pred.date; }).sort().reverse();
-          if (dts.length > 0) { row = cache[dts[0]]; if (dts[0] !== pred.date) lg(pred.symbol+': using nearest date '+dts[0]+' for '+pred.date,'db','warn'); }
+          var dts = Object.keys(cache).filter(function(d){ return d<=pred.date; }).sort().reverse();
+          if (dts.length>0) { row=cache[dts[0]]; if(dts[0]!==pred.date) lg(pred.symbol+': nearest date '+dts[0]+' for '+pred.date,'db','warn'); }
         }
         if (!row || !row.open || row.open<=0 || !row.close || row.close<=0) {
           lg(pred.symbol+' '+pred.date+': no data — stays pending','db','warn'); skipped++; continue;
         }
-        var open  = row.open, high = Math.max(row.high||0, row.open, row.close), close = row.close;
-        var highPct  = ((high  - open) / open) * 100;
-        var closePct = ((close - open) / open) * 100;
-        var verdict  = highPct >= pred.target_min ? 'hit' :
-                       highPct >= pred.target_min * 0.6 ? 'partial' :
-                       highPct >= 1.5 ? 'partial' : 'miss';
+        var open=row.open, high=Math.max(row.high||0,row.open,row.close), close=row.close;
+        var highPct=((high-open)/open)*100, closePct=((close-open)/open)*100;
+        var verdict=highPct>=pred.target_min?'hit':highPct>=pred.target_min*0.6?'partial':highPct>=1.5?'partial':'miss';
         if(verdict==='hit') hits++; else if(verdict==='partial') partials++; else misses++;
         await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
           open_price:parseFloat(open.toFixed(2)),
@@ -1330,9 +1319,9 @@ async function runVerification() {
         lg(pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       } catch(e) { lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); skipped++; }
     }
-    var total = hits+partials+misses;
+    var total=hits+partials+misses;
     lg('Verify Past done: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' still pending','db','ok');
-    if (total>0) lg('Success rate: '+Math.round((hits+partials*0.5)/total*100)+'%','db','ok');
+    if(total>0) lg('Success rate: '+Math.round((hits+partials*0.5)/total*100)+'%','db','ok');
     await loadHistory();
   } catch(e) { lg('Verification failed: '+e.message,'db','err'); }
 }
