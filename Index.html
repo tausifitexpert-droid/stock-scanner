@@ -609,7 +609,7 @@ setInterval(function() { checkMarketStatus(); }, 5 * 60 * 1000);
 
 // ═══════════════════════════════════════════════════
 // AUTO EOD SCHEDULER
-// Runs verification at 4:01 PM EST — weekdays only
+// Runs verification at 4:30 PM EST — weekdays only (FMP EOD data not published until ~4:15-4:30 PM)
 // Skips if market was closed (holiday/weekend)
 // Page must be open. Checks every 60 seconds.
 // ═══════════════════════════════════════════════════
@@ -622,7 +622,7 @@ function checkAutoEOD() {
   var dateStr = est.getFullYear()+'-'+String(est.getMonth()+1).padStart(2,'0')+'-'+String(est.getDate()).padStart(2,'0');
 
   if (wd === 0 || wd === 6) return;           // skip weekends
-  if (hm < 961 || hm > 1005) return;          // 4:01 PM - 4:45 PM only
+  if (hm < 990 || hm > 1035) return;          // 4:30 PM - 5:15 PM only (FMP EOD data ready ~4:15-4:30 PM)
   if (eodAutoRan === dateStr) return;          // already ran today
 
   // KEY CHECK: skip if market was closed today (bank holiday)
@@ -652,14 +652,14 @@ setTimeout(checkAutoEOD, 3000);
 
 // ── PAGE-LOAD EOD CHECK ─────────────────────────────────────────
 // If user opens page after 4PM on a weekday, run EOD verification
-// once — catches the case where the 4:01-4:45PM window was missed
+// once — catches the case where the 4:30-5:15PM window was missed
 (function() {
   setTimeout(function() {
     var est = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
     var wd  = est.getDay();
     var hm  = est.getHours()*60 + est.getMinutes();
     var ds  = est.getFullYear()+'-'+String(est.getMonth()+1).padStart(2,'0')+'-'+String(est.getDate()).padStart(2,'0');
-    if (wd>=1 && wd<=5 && hm>=961 && eodAutoRan !== ds && !mktStatus.isHoliday) {
+    if (wd>=1 && wd<=5 && hm>=990 && eodAutoRan !== ds && !mktStatus.isHoliday) {
       lg('PAGE LOAD: Market closed for today, running EOD verification...','db','ok');
       eodAutoRan = ds;
       localStorage.setItem('eodAutoRan', ds);
@@ -930,19 +930,31 @@ async function runEODVerification(silent) {
 
     for (var si=0; si<pastSyms.length; si++) {
       var sym = pastSyms[si];
+      lg('Fetching history ' + (si+1) + '/' + pastSyms.length + ': ' + sym, 'db');
       try {
         var hr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
         if (hr.ok) {
           var hd = await hr.json();
           var hist = hd.historical||(Array.isArray(hd)?hd:[]);
           if (!hist.length) { var ks=Object.keys(hd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(hd[ks[ki]])){hist=hd[ks[ki]];break;}} }
+          if (!hist.length) {
+            // Empty = likely rate limited (FMP returns HTTP 200 + empty array on rate limit)
+            lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
+            await sleep(10000);
+            var hr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
+            if (hr2.ok) {
+              var hd2 = await hr2.json();
+              hist = hd2.historical||(Array.isArray(hd2)?hd2:[]);
+              if (!hist.length) { var ks2=Object.keys(hd2||{}); for(var ki2=0;ki2<ks2.length;ki2++){if(Array.isArray(hd2[ks2[ki2]])){hist=hd2[ks2[ki2]];break;}} }
+            }
+          }
           var byDate = {};
           hist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open),high:parseFloat(row.high||row.close),close:parseFloat(row.close)}; });
           histCache[sym] = byDate;
           lg(sym + ': ' + hist.length + ' days', 'db', hist.length>0?'ok':'warn');
         }
       } catch(e) { lg(sym + ' hist error: '+e.message, 'db', 'err'); histCache[sym]={}; }
-      await sleep(1200);
+      if (si < pastSyms.length - 1) await sleep(3000);
     }
 
     // Batch quote for today's pending symbols
@@ -1241,45 +1253,88 @@ async function reVerifyAll() {
   finally{ if(btn){ btn.textContent='Re-Verify All Results'; btn.disabled=false; } }
 }
 
-// Past pending verification
+// Past pending verification — batched by unique symbol to avoid FMP rate limits
 async function runVerification() {
-    var estTmp=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  var today=estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
-  lg('Verifying past pending predictions...','db');
-  try{
-    var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=lt.'+today+'&select=id,symbol,date,target_min,target_max');
-    if(!pending||!pending.length){lg('No past pending predictions','db');return;}
-    for(var i=0;i<pending.length;i++){
-      var pred=pending[i];
-      try{
-        var url='https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
-        var r=await fetch(url); if(!r.ok) continue;
-        var data=await r.json();
-        var hist=data.historical||(Array.isArray(data)?data:[]);
-        // Match exact date or take first result
-        var day=hist.find(function(x){return x.date===pred.date;})||hist[0];
-        if(!day) continue;
-        // Use actual market open (9:30 AM) — not our scan price
-        var actualOpen  = parseFloat(day.open);
-        var actualClose = parseFloat(day.close);
-        var actualPct   = ((actualClose - actualOpen) / actualOpen) * 100;
-        var verdict;
-        if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
-        else if(actualPct >= pred.target_min * 0.5) verdict='partial';
-        else if(actualPct >= 1.5) verdict='partial';
-        else verdict='miss';
+  var estTmp = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  var today  = estTmp.getFullYear()+'-'+String(estTmp.getMonth()+1).padStart(2,'0')+'-'+String(estTmp.getDate()).padStart(2,'0');
+  var fromDt = new Date(Date.now()-90*24*60*60*1000);
+  var fromStr= fromDt.getFullYear()+'-'+String(fromDt.getMonth()+1).padStart(2,'0')+'-'+String(fromDt.getDate()).padStart(2,'0');
+  lg('Verifying past pending predictions (batched by symbol)...','db');
+  try {
+    var pending = await dbQuery('apex_predictions?verdict=eq.pending&date=lt.'+today+'&select=id,symbol,date,target_min,target_max');
+    if (!pending || !pending.length) { lg('No past pending predictions','db'); return; }
+    lg('Found ' + pending.length + ' past pending picks', 'db');
+
+    // Unique symbols — batch fetch, not per-record (per-record hits rate limits)
+    var symbols = [];
+    pending.forEach(function(p){ if(symbols.indexOf(p.symbol)===-1) symbols.push(p.symbol); });
+    lg('Unique symbols: ' + symbols.length + ' (3s apart)', 'db');
+
+    var histCache = {};
+    for (var si=0; si<symbols.length; si++) {
+      var sym = symbols[si];
+      lg('Fetching ' + (si+1) + '/' + symbols.length + ': ' + sym, 'db');
+      try {
+        var r = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+today+'&apikey='+FMP);
+        if (r.ok) {
+          var d = await r.json();
+          var hist = d.historical||(Array.isArray(d)?d:[]);
+          if (!hist.length) { var ks=Object.keys(d||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(d[ks[ki]])){hist=d[ks[ki]];break;}} }
+          if (!hist.length) {
+            // Empty = FMP rate limit (HTTP 200 + empty array) — retry after 10s
+            lg(sym + ': empty (rate limit?), retrying after 10s...', 'db', 'warn');
+            await sleep(10000);
+            var r2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+today+'&apikey='+FMP);
+            if (r2.ok) {
+              var d2 = await r2.json();
+              hist = d2.historical||(Array.isArray(d2)?d2:[]);
+              if (!hist.length) { var ks2=Object.keys(d2||{}); for(var ki2=0;ki2<ks2.length;ki2++){if(Array.isArray(d2[ks2[ki2]])){hist=d2[ks2[ki2]];break;}} }
+            }
+          }
+          var byDate = {};
+          hist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
+          histCache[sym] = byDate;
+          lg(sym + ': ' + hist.length + ' days', 'db', hist.length>0?'ok':'warn');
+        }
+      } catch(e) { lg(sym + ' error: '+e.message,'db','err'); histCache[sym]={}; }
+      if (si < symbols.length - 1) await sleep(3000);
+    }
+
+    var hits=0, partials=0, misses=0, skipped=0;
+    for (var i=0; i<pending.length; i++) {
+      var pred = pending[i];
+      try {
+        var cache = histCache[pred.symbol] || {};
+        var row   = cache[pred.date];
+        if (!row) {
+          // Exact date missing — find nearest prior trading day
+          var dts = Object.keys(cache).filter(function(d){ return d <= pred.date; }).sort().reverse();
+          if (dts.length > 0) { row = cache[dts[0]]; if (dts[0] !== pred.date) lg(pred.symbol+': using nearest date '+dts[0]+' for '+pred.date,'db','warn'); }
+        }
+        if (!row || !row.open || row.open<=0 || !row.close || row.close<=0) {
+          lg(pred.symbol+' '+pred.date+': no data — stays pending','db','warn'); skipped++; continue;
+        }
+        var open  = row.open, high = Math.max(row.high||0, row.open, row.close), close = row.close;
+        var highPct  = ((high  - open) / open) * 100;
+        var closePct = ((close - open) / open) * 100;
+        var verdict  = highPct >= pred.target_min ? 'hit' :
+                       highPct >= pred.target_min * 0.6 ? 'partial' :
+                       highPct >= 1.5 ? 'partial' : 'miss';
+        if(verdict==='hit') hits++; else if(verdict==='partial') partials++; else misses++;
         await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
-          open_price:parseFloat(actualOpen.toFixed(2)),
-          close_price:parseFloat(actualClose.toFixed(2)),
-          actual_pct:parseFloat(actualPct.toFixed(2)),
+          open_price:parseFloat(open.toFixed(2)),
+          close_price:parseFloat(close.toFixed(2)),
+          actual_pct:parseFloat(closePct.toFixed(2)),
           verdict:verdict
         });
-        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
-      }catch(e){lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); console.error('APEX EOD error',pred.symbol, e);}
-      await sleep(150);
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(open)+' high=$'+f2(high)+' (+'+f2(highPct)+'%) → '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+      } catch(e) { lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); skipped++; }
     }
+    var total = hits+partials+misses;
+    lg('Verify Past done: '+hits+' hits, '+partials+' partial, '+misses+' misses, '+skipped+' still pending','db','ok');
+    if (total>0) lg('Success rate: '+Math.round((hits+partials*0.5)/total*100)+'%','db','ok');
     await loadHistory();
-  }catch(e){lg('Verification failed: '+e.message,'db','err');}
+  } catch(e) { lg('Verification failed: '+e.message,'db','err'); }
 }
 
 // ═══════════════════════════════════════════════════
