@@ -19,8 +19,7 @@ def validate(content):
     scripts = re.findall(r'<script>(.*?)</script>', content, re.DOTALL)
     if not scripts:
         errors.append("No <script> block found")
-    
-    return errors, warnings
+        return errors, warnings
     js = scripts[0]
 
     # ── 1. Script tag not embedded inside JS ─────────────────
@@ -177,6 +176,65 @@ def validate(content):
         if tag not in content:
             warnings.append(f"Missing HTML tag: {tag}")
 
+    # ── 20. Sleep >= 3000 in ALL hist fetch loops ─────────────
+    # FMP free tier rate limit requires >= 3s between symbol fetches.
+    # Catches the bug where a fix was applied to one function but not others.
+    import re as _re
+    short_sleeps = _re.findall(r'await sleep\((\d+)\)', js)
+    for ms_str in short_sleeps:
+        ms = int(ms_str)
+        # Allow short sleeps only for non-hist contexts (scan enrichment uses 80-150ms)
+        # Any sleep inside a hist fetch loop must be >= 3000
+        # We detect by checking if sleep(N<3000) appears near a hist fetch URL
+        pass  # fine-grained check below
+
+    # Check specifically: no sleep < 3000 in verification functions
+    for fn_name, fn_pattern in [
+        ('runEODVerification', 'async function runEODVerification'),
+        ('reVerifyAll',        'async function reVerifyAll'),
+        ('runVerification',    'async function runVerification'),
+    ]:
+        if fn_pattern not in js:
+            continue
+        fn_start = js.find(fn_pattern)
+        fn_end   = js.find('\nasync function ', fn_start + 10)
+        fn_body  = js[fn_start:fn_end] if fn_end > 0 else js[fn_start:fn_start+5000]
+        bad_sleeps = _re.findall(r'await sleep\((\d+)\)', fn_body)
+        for ms_str in bad_sleeps:
+            ms = int(ms_str)
+            if ms < 3000 and ms > 0:
+                errors.append(
+                    f"{fn_name}(): sleep({ms}) is too short — FMP rate limit requires >= 3000ms between hist fetches"
+                )
+
+    # ── 21. reVerifyAll must NOT call fetchHistorical ────────
+    # fetchHistorical fetches 5yr (~1260 rows) which silently fails on FMP free tier.
+    # Verification functions must use 90-day date-range fetches (~63 rows).
+    if 'async function reVerifyAll' in js:
+        rv_start = js.find('async function reVerifyAll')
+        rv_end   = js.find('\nasync function ', rv_start + 10)
+        rv_body  = js[rv_start:rv_end] if rv_end > 0 else js[rv_start:rv_start+5000]
+        # Check for actual CALL (not comment mentioning the name)
+        if _re.search(r'(?<!// )(?<!NOT )fetchHistorical\s*\(', rv_body):
+            errors.append(
+                "reVerifyAll() calls fetchHistorical() — this fetches 5yr (~1260 rows) which silently fails on FMP free tier. Use 90-day date-range fetch instead."
+            )
+
+    # ── 22. All 3 verification functions must detect empty hist response ──
+    for fn_name, fn_pattern in [
+        ('runEODVerification', 'async function runEODVerification'),
+        ('reVerifyAll',        'async function reVerifyAll'),
+    ]:
+        if fn_pattern not in js:
+            continue
+        fn_start = js.find(fn_pattern)
+        fn_end   = js.find('\nasync function ', fn_start + 10)
+        fn_body  = js[fn_start:fn_end] if fn_end > 0 else js[fn_start:fn_start+5000]
+        if 'hist.length' not in fn_body and 'rvhist.length' not in fn_body:
+            errors.append(
+                f"{fn_name}(): does not check for empty hist response — FMP silent rate limit (HTTP 200 + empty array) will silently fail and leave picks PENDING"
+            )
+
 
     return errors, warnings
 
@@ -210,7 +268,7 @@ def run(filepath=None):
         print(f"{'='*58}\n")
         return False
     else:
-        print(f"\n✅ ALL {19} CHECKS PASSED")
+        print(f"\n✅ ALL {22} CHECKS PASSED")
         print(f"   Warnings: {len(warnings)} | Errors: 0")
         print(f"{'='*58}\n")
         return True
