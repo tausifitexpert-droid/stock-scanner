@@ -928,6 +928,15 @@ async function runEODVerification(silent) {
     var histCache = {};
     var pastSyms  = syms.filter(function(s){ return pending.some(function(p){ return p.symbol===s && p.date!==todayStr; }); });
 
+    // ── DIAGNOSTIC: log computed dates and symbol routing ──
+    lg('DIAG todayStr='+todayStr+' fromStr='+fromStr, 'db');
+    lg('DIAG syms='+syms.join(','), 'db');
+    lg('DIAG pastSyms='+pastSyms.join(',')+' ('+pastSyms.length+' to fetch hist)', 'db');
+    var _todaySymsDiag = pending.filter(function(p){ return p.date===todayStr; }).map(function(p){ return p.symbol; });
+    lg('DIAG todaySyms='+_todaySymsDiag.join(',')+' ('+_todaySymsDiag.length+' to quote)', 'db');
+    pending.forEach(function(p){ lg('DIAG pick: '+p.symbol+' date='+p.date+' isPast='+(p.date!==todayStr), 'db'); });
+    // ── END DIAGNOSTIC ──
+
     for (var si=0; si<pastSyms.length; si++) {
       var sym = pastSyms[si];
       try {
