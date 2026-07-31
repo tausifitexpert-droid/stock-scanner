@@ -928,15 +928,6 @@ async function runEODVerification(silent) {
     var histCache = {};
     var pastSyms  = syms.filter(function(s){ return pending.some(function(p){ return p.symbol===s && p.date!==todayStr; }); });
 
-    // ── DIAGNOSTIC: log computed dates and symbol routing ──
-    lg('DIAG todayStr='+todayStr+' fromStr='+fromStr, 'db');
-    lg('DIAG syms='+syms.join(','), 'db');
-    lg('DIAG pastSyms='+pastSyms.join(',')+' ('+pastSyms.length+' to fetch hist)', 'db');
-    var _todaySymsDiag = pending.filter(function(p){ return p.date===todayStr; }).map(function(p){ return p.symbol; });
-    lg('DIAG todaySyms='+_todaySymsDiag.join(',')+' ('+_todaySymsDiag.length+' to quote)', 'db');
-    pending.forEach(function(p){ lg('DIAG pick: '+p.symbol+' date='+p.date+' isPast='+(p.date!==todayStr), 'db'); });
-    // ── END DIAGNOSTIC ──
-
     for (var si=0; si<pastSyms.length; si++) {
       var sym = pastSyms[si];
       try {
@@ -947,26 +938,8 @@ async function runEODVerification(silent) {
           if (!hist.length) { var ks=Object.keys(hd||{}); for(var ki=0;ki<ks.length;ki++){if(Array.isArray(hd[ks[ki]])){hist=hd[ks[ki]];break;}} }
           var byDate = {};
           hist.forEach(function(row){ if(row.date) byDate[row.date]={open:parseFloat(row.open),high:parseFloat(row.high||row.close),close:parseFloat(row.close)}; });
-          if (hist.length > 0) {
-            histCache[sym] = byDate;
-            lg(sym + ': ' + hist.length + ' days loaded', 'db', 'ok');
-          } else {
-            // FMP silent rate limit — HTTP 200 + empty array. Wait 10s and retry once.
-            lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
-            await sleep(10000);
-            try {
-              var hr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+fromStr+'&to='+todayStr+'&apikey='+FMP);
-              if (hr2.ok) {
-                var hd2 = await hr2.json();
-                var hist2 = hd2.historical||(Array.isArray(hd2)?hd2:[]);
-                if (!hist2.length) { var ks2=Object.keys(hd2||{}); for(var ki2=0;ki2<ks2.length;ki2++){if(Array.isArray(hd2[ks2[ki2]])){hist2=hd2[ks2[ki2]];break;}} }
-                var byDate2 = {};
-                hist2.forEach(function(row){ if(row.date) byDate2[row.date]={open:parseFloat(row.open),high:parseFloat(row.high||row.close),close:parseFloat(row.close)}; });
-                histCache[sym] = byDate2;
-                lg(sym + ': retry ' + (hist2.length>0?hist2.length+' days loaded':'still empty — no data'), 'db', hist2.length>0?'ok':'warn');
-              }
-            } catch(e2) { lg(sym + ' retry error: '+e2.message, 'db', 'err'); histCache[sym]={}; }
-          }
+          histCache[sym] = byDate;
+          lg(sym + ': ' + hist.length + ' days', 'db', hist.length>0?'ok':'warn');
         }
       } catch(e) { lg(sym + ' hist error: '+e.message, 'db', 'err'); histCache[sym]={}; }
       await sleep(3000);
@@ -1147,45 +1120,44 @@ async function reVerifyAll() {
     pending.forEach(function(r){ if(symbols.indexOf(r.symbol)===-1) symbols.push(r.symbol); });
     lg('Unique symbols to fetch: ' + symbols.length + ' (3s apart, ~' + (symbols.length*3) + 's total)', 'db');
 
-    // Build histCache using 90-day date-range fetch (NOT fetchHistorical which is 5yr/1260rows)
-    // FMP free tier silently fails on >~100 rows. 90 days = ~63 rows — safe.
+    // Build histCache using a SCOPED date-range fetch (~120 days), not fetchHistorical()
+    // fetchHistorical() pulls 5yr/~1260 rows and silently exceeds FMP free-tier
+    // per-call row limits (200 + empty array). A scoped range stays well under that.
+    var rvFrom = new Date(Date.now() - 120*24*60*60*1000);
+    var rvFromStr = rvFrom.getFullYear()+'-'+String(rvFrom.getMonth()+1).padStart(2,'0')+'-'+String(rvFrom.getDate()).padStart(2,'0');
     var histCache = {};
-    var rvFromDate = new Date(Date.now() - 90*24*60*60*1000);
-    var rvEst = new Date(rvFromDate.toLocaleString('en-US',{timeZone:'America/New_York'}));
-    var rvFromStr = rvEst.getFullYear()+'-'+String(rvEst.getMonth()+1).padStart(2,'0')+'-'+String(rvEst.getDate()).padStart(2,'0');
-    var rvNow = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-    var rvToStr = rvNow.getFullYear()+'-'+String(rvNow.getMonth()+1).padStart(2,'0')+'-'+String(rvNow.getDate()).padStart(2,'0');
     for (var si = 0; si < symbols.length; si++) {
       var sym = symbols[si];
-      lg('Fetching 90d history ' + (si+1) + '/' + symbols.length + ': ' + sym + '...', 'db');
-      try {
-        var rvr = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+rvFromStr+'&to='+rvToStr+'&apikey='+FMP);
-        if (rvr.ok) {
-          var rvd = await rvr.json();
-          var rvhist = rvd.historical||(Array.isArray(rvd)?rvd:[]);
-          if (!rvhist.length) { var rvks=Object.keys(rvd||{}); for(var rvki=0;rvki<rvks.length;rvki++){if(Array.isArray(rvd[rvks[rvki]])){rvhist=rvd[rvks[rvki]];break;}} }
-          if (rvhist.length > 0) {
-            var rvByDate = {};
-            rvhist.forEach(function(row){ if(row.date) rvByDate[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
-            histCache[sym] = rvByDate;
-            lg(sym + ': ' + rvhist.length + ' days loaded', 'db', 'ok');
-          } else {
-            // FMP silent rate limit — HTTP 200 + empty. Wait 10s and retry once.
-            lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
-            await sleep(10000);
-            var rvr2 = await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+sym+'&from='+rvFromStr+'&to='+rvToStr+'&apikey='+FMP);
-            if (rvr2.ok) {
-              var rvd2 = await rvr2.json();
-              var rvhist2 = rvd2.historical||(Array.isArray(rvd2)?rvd2:[]);
-              if (!rvhist2.length) { var rvks2=Object.keys(rvd2||{}); for(var rvki2=0;rvki2<rvks2.length;rvki2++){if(Array.isArray(rvd2[rvks2[rvki2]])){rvhist2=rvd2[rvks2[rvki2]];break;}} }
-              var rvByDate2 = {};
-              rvhist2.forEach(function(row){ if(row.date) rvByDate2[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)}; });
-              histCache[sym] = rvByDate2;
-              lg(sym + ': retry ' + (rvhist2.length>0?rvhist2.length+' days loaded':'still empty — no data'), 'db', rvhist2.length>0?'ok':'warn');
-            } else { histCache[sym] = {}; }
-          }
+      lg('Fetching history ' + (si+1) + '/' + symbols.length + ': ' + sym + '...', 'db');
+      var hist = await fetchScopedHistorical(sym, rvFromStr, todayEst);
+      if (hist && hist.length > 0) {
+        var byDate = {};
+        hist.forEach(function(row){
+          if (row.date) byDate[row.date] = {
+            open:  parseFloat(row.open  || 0),
+            high:  parseFloat(row.high  || row.close || 0),
+            close: parseFloat(row.close || 0)
+          };
+        });
+        histCache[sym] = byDate;
+        lg(sym + ': ' + hist.length + ' days. Sample dates: ' + Object.keys(byDate).slice(0,3).join(', '), 'db', 'ok');
+      } else {
+        // Empty response = likely rate limited (FMP returns 200 + [] silently) — wait longer and retry once
+        lg(sym + ': empty response (rate limit?), waiting 10s then retrying...', 'db', 'warn');
+        await sleep(10000);
+        var hist2 = await fetchScopedHistorical(sym, rvFromStr, todayEst);
+        if (hist2 && hist2.length > 0) {
+          var byDate2 = {};
+          hist2.forEach(function(row){
+            if(row.date) byDate2[row.date]={open:parseFloat(row.open||0),high:parseFloat(row.high||row.close||0),close:parseFloat(row.close||0)};
+          });
+          histCache[sym] = byDate2;
+          lg(sym + ': retry OK — ' + hist2.length + ' days', 'db', 'ok');
+        } else {
+          histCache[sym] = {};
+          lg(sym + ': no data after retry — may not be on FMP free tier', 'db', 'warn');
         }
-      } catch(rve) { lg(sym + ' fetch error: '+rve.message, 'db', 'err'); histCache[sym]={}; }
+      }
       // 3 second gap between symbols — respects FMP free tier rate limit
       if (si < symbols.length - 1) await sleep(3000);
     }
@@ -1280,33 +1252,49 @@ async function runVerification() {
   try{
     var pending=await dbQuery('apex_predictions?verdict=eq.pending&date=lt.'+today+'&select=id,symbol,date,target_min,target_max');
     if(!pending||!pending.length){lg('No past pending predictions','db');return;}
+    // Scoped date range (~120 days) — NOT a single-day from/to, which is fragile
+    // around non-trading days, and NOT fetchHistorical() (5yr/1260 rows, exceeds
+    // FMP free-tier per-call limits).
+    var rvFrom=new Date(Date.now()-120*24*60*60*1000);
+    var rvFromStr=rvFrom.getFullYear()+'-'+String(rvFrom.getMonth()+1).padStart(2,'0')+'-'+String(rvFrom.getDate()).padStart(2,'0');
     for(var i=0;i<pending.length;i++){
       var pred=pending[i];
       try{
-        var url='https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+pred.symbol+'&from='+pred.date+'&to='+pred.date+'&apikey='+FMP;
-        var r=await fetch(url); if(!r.ok) continue;
-        var data=await r.json();
-        var hist=data.historical||(Array.isArray(data)?data:[]);
-        // Match exact date or take first result
-        var day=hist.find(function(x){return x.date===pred.date;})||hist[0];
-        if(!day) continue;
+        var hist=await fetchScopedHistorical(pred.symbol, rvFromStr, today);
+        if(!hist||!hist.length){
+          // Empty response = likely FMP silent rate limit (200 + []) — wait and retry once
+          lg(pred.symbol+': empty response (rate limit?), waiting 10s then retrying...','db','warn');
+          await sleep(10000);
+          hist=await fetchScopedHistorical(pred.symbol, rvFromStr, today);
+        }
+        if(!hist||!hist.length){ lg(pred.symbol+' '+pred.date+': no data after retry — stays pending','db','warn'); await sleep(3000); continue; }
+        // Match exact date or nearest past trading day
+        var day=hist.find(function(x){return x.date===pred.date;});
+        if(!day){
+          var past=hist.filter(function(x){return x.date<=pred.date;}).sort(function(a,b){return b.date.localeCompare(a.date);});
+          day=past.length?past[0]:null;
+        }
+        if(!day){ lg(pred.symbol+' '+pred.date+': no matching trading day — stays pending','db','warn'); await sleep(3000); continue; }
         // Use actual market open (9:30 AM) — not our scan price
         var actualOpen  = parseFloat(day.open);
         var actualClose = parseFloat(day.close);
-        var actualPct   = ((actualClose - actualOpen) / actualOpen) * 100;
-        var verdict;
-        if(actualPct >= pred.target_min && actualPct <= pred.target_max) verdict='hit';
-        else if(actualPct >= pred.target_min * 0.5) verdict='partial';
-        else if(actualPct >= 1.5) verdict='partial';
-        else verdict='miss';
+        var actualHigh  = parseFloat(day.high || day.close);
+        if(!actualOpen || actualOpen<=0 || !actualClose || actualClose<=0){ lg(pred.symbol+' '+pred.date+': open/close=0 — stays pending','db','warn'); await sleep(3000); continue; }
+        actualHigh = Math.max(actualHigh||0, actualOpen, actualClose);
+        var highPct   = ((actualHigh  - actualOpen) / actualOpen) * 100;
+        var actualPct = ((actualClose - actualOpen) / actualOpen) * 100;
+        var verdict = highPct >= pred.target_min ? 'hit' :
+                      highPct >= pred.target_min*0.6 ? 'partial' :
+                      highPct >= 1.5 ? 'partial' : 'miss';
         await dbQuery('apex_predictions?id=eq.'+pred.id,'PATCH',{
           open_price:parseFloat(actualOpen.toFixed(2)),
           close_price:parseFloat(actualClose.toFixed(2)),
           actual_pct:parseFloat(actualPct.toFixed(2)),
           verdict:verdict
         });
-        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
+        lg(pred.symbol+' '+pred.date+': open=$'+f2(actualOpen)+' high=$'+f2(actualHigh)+' close=$'+f2(actualClose)+' actual='+pctSign(actualPct)+' target=+'+f2(pred.target_min)+'->+'+f2(pred.target_max)+'% -> '+verdict.toUpperCase(),'db',verdict==='hit'?'ok':verdict==='partial'?'warn':'err');
       }catch(e){lg('ERROR '+pred.symbol+' STAYS PENDING: '+e.message,'db','err'); console.error('APEX EOD error',pred.symbol, e);}
+      // 3 second gap between symbols — respects FMP free tier rate limit
       await sleep(3000);
     }
     await loadHistory();
@@ -1446,6 +1434,20 @@ async function fetchHistorical(symbol) {
     var to=estHst.getFullYear()+'-'+String(estHst.getMonth()+1).padStart(2,'0')+'-'+String(estHst.getDate()).padStart(2,'0');
     var from=new Date(Date.now()-5*365*24*60*60*1000).toISOString().split('T')[0];
     var r=await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+symbol+'&from='+from+'&to='+to+'&apikey='+FMP);
+    if(!r.ok) return null;
+    var d=await r.json();
+    var hist=d.historical||(Array.isArray(d)?d:[]);
+    return hist.length>0?hist:null;
+  }catch(e){return null;}
+}
+
+// Scoped date-range historical fetch — used by verification functions instead of
+// fetchHistorical() (which pulls 5yr/~1260 rows and silently exceeds FMP free-tier
+// per-call row limits, returning HTTP 200 + empty array). A ~90-120 day window
+// covers any realistic pending-verification backlog while staying under that limit.
+async function fetchScopedHistorical(symbol, fromStr, toStr) {
+  try{
+    var r=await fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+symbol+'&from='+fromStr+'&to='+toStr+'&apikey='+FMP);
     if(!r.ok) return null;
     var d=await r.json();
     var hist=d.historical||(Array.isArray(d)?d:[]);

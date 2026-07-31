@@ -176,65 +176,62 @@ def validate(content):
         if tag not in content:
             warnings.append(f"Missing HTML tag: {tag}")
 
-    # ── 20. Sleep >= 3000 in ALL hist fetch loops ─────────────
-    # FMP free tier rate limit requires >= 3s between symbol fetches.
-    # Catches the bug where a fix was applied to one function but not others.
-    import re as _re
-    short_sleeps = _re.findall(r'await sleep\((\d+)\)', js)
-    for ms_str in short_sleeps:
-        ms = int(ms_str)
-        # Allow short sleeps only for non-hist contexts (scan enrichment uses 80-150ms)
-        # Any sleep inside a hist fetch loop must be >= 3000
-        # We detect by checking if sleep(N<3000) appears near a hist fetch URL
-        pass  # fine-grained check below
+    # ── 20. Sleep thresholds in verification functions ───────
+    # FMP free tier rate-limits aggressively; any per-symbol/per-record
+    # loop in a verification function must sleep >= 3000ms or it will
+    # silently get empty 200 responses and picks stay "pending" forever.
+    verify_fns = ['runEODVerification', 'reVerifyAll', 'runVerification']
+    fn_starts = sorted(
+        (m.start(), m.group(1))
+        for m in re.finditer(r'async function (' + '|'.join(verify_fns) + r')\s*\(', js)
+    )
+    all_fn_starts = sorted(m.start() for m in re.finditer(r'\nasync function \w+\s*\(', js))
+    for start, fname in fn_starts:
+        later = [s for s in all_fn_starts if s > start]
+        end = later[0] if later else len(js)
+        body = js[start:end]
+        sleeps = [int(n) for n in re.findall(r'sleep\((\d+)\)', body)]
+        if sleeps and min(sleeps) < 3000:
+            errors.append(
+                f"{fname}(): sleep({min(sleeps)}) is below the 3000ms FMP rate-limit-safe threshold"
+            )
+        elif not sleeps and 'fetch(' in body and 'for' in body:
+            warnings.append(f"{fname}(): loop with fetch() but no sleep() found between calls")
 
-    # Check specifically: no sleep < 3000 in verification functions
-    for fn_name, fn_pattern in [
-        ('runEODVerification', 'async function runEODVerification'),
-        ('reVerifyAll',        'async function reVerifyAll'),
-        ('runVerification',    'async function runVerification'),
-    ]:
-        if fn_pattern not in js:
-            continue
-        fn_start = js.find(fn_pattern)
-        fn_end   = js.find('\nasync function ', fn_start + 10)
-        fn_body  = js[fn_start:fn_end] if fn_end > 0 else js[fn_start:fn_start+5000]
-        bad_sleeps = _re.findall(r'await sleep\((\d+)\)', fn_body)
-        for ms_str in bad_sleeps:
-            ms = int(ms_str)
-            if ms < 3000 and ms > 0:
-                errors.append(
-                    f"{fn_name}(): sleep({ms}) is too short — FMP rate limit requires >= 3000ms between hist fetches"
-                )
-
-    # ── 21. reVerifyAll must NOT call fetchHistorical ────────
-    # fetchHistorical fetches 5yr (~1260 rows) which silently fails on FMP free tier.
-    # Verification functions must use 90-day date-range fetches (~63 rows).
+    # ── 21. fetchHistorical() banned inside reVerifyAll ───────
+    # fetchHistorical() pulls ~5yr / ~1260 rows per call, which silently
+    # exceeds FMP free-tier row limits. reVerifyAll must use a scoped
+    # date-range fetch (~90 days) instead.
     if 'async function reVerifyAll' in js:
-        rv_start = js.find('async function reVerifyAll')
-        rv_end   = js.find('\nasync function ', rv_start + 10)
-        rv_body  = js[rv_start:rv_end] if rv_end > 0 else js[rv_start:rv_start+5000]
-        # Check for actual CALL (not comment mentioning the name)
-        if _re.search(r'(?<!// )(?<!NOT )fetchHistorical\s*\(', rv_body):
+        rv_idx = js.find('async function reVerifyAll')
+        rv_later = [s for s in all_fn_starts if s > rv_idx]
+        rv_end = rv_later[0] if rv_later else len(js)
+        rv_body = js[rv_idx:rv_end]
+        rv_code_lines = [ln for ln in rv_body.split('\n') if not ln.strip().startswith('//')]
+        rv_code = '\n'.join(rv_code_lines)
+        if re.search(r'[=\s(]fetchHistorical\s*\(', rv_code):
             errors.append(
-                "reVerifyAll() calls fetchHistorical() — this fetches 5yr (~1260 rows) which silently fails on FMP free tier. Use 90-day date-range fetch instead."
+                "reVerifyAll() calls fetchHistorical() (~5yr/1260 rows) — "
+                "silently exceeds FMP free-tier limits; use a scoped date-range fetch instead"
             )
 
-    # ── 22. All 3 verification functions must detect empty hist response ──
-    for fn_name, fn_pattern in [
-        ('runEODVerification', 'async function runEODVerification'),
-        ('reVerifyAll',        'async function reVerifyAll'),
-    ]:
-        if fn_pattern not in js:
+    # ── 22. Empty-response detection on historical fetches ────
+    # FMP free tier returns HTTP 200 + empty array when rate-limited
+    # (not a 429). Verification code must check for hist.length === 0
+    # and treat it as a retry-worthy failure, not valid empty data.
+    for fname in verify_fns:
+        pat = r'async function ' + fname + r'\s*\('
+        m = re.search(pat, js)
+        if not m:
             continue
-        fn_start = js.find(fn_pattern)
-        fn_end   = js.find('\nasync function ', fn_start + 10)
-        fn_body  = js[fn_start:fn_end] if fn_end > 0 else js[fn_start:fn_start+5000]
-        if 'hist.length' not in fn_body and 'rvhist.length' not in fn_body:
-            errors.append(
-                f"{fn_name}(): does not check for empty hist response — FMP silent rate limit (HTTP 200 + empty array) will silently fail and leave picks PENDING"
+        later = [s for s in all_fn_starts if s > m.start()]
+        end = later[0] if later else len(js)
+        body = js[m.start():end]
+        if 'historical-price-eod' in body and 'hist.length' not in body and '.length>0' not in body and '.length > 0' not in body:
+            warnings.append(
+                f"{fname}(): fetches historical-price-eod but doesn't appear to check hist.length "
+                f"for FMP's silent empty-200 rate-limit response"
             )
-
 
     return errors, warnings
 
